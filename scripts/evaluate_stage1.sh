@@ -20,4 +20,10 @@ uv="$HOME/.local/bin/uv"
   --output "$results/random-synthetic.json"
 "$uv" run ligm-evaluate "$root/runs/stage1-ligm-seed11/final" \
   --output "$results/ligm-synthetic.json"
+"$uv" run ligm-evaluate "$root/models/ModernBERT-base" \
+  --natural-config configs/stage1-random.yaml --output "$results/base-natural.json"
+"$uv" run ligm-evaluate "$root/runs/stage1-random-seed11/final" \
+  --natural-config configs/stage1-random.yaml --output "$results/random-natural.json"
+"$uv" run ligm-evaluate "$root/runs/stage1-ligm-seed11/final" \
+  --natural-config configs/stage1-random.yaml --output "$results/ligm-natural.json"
 "$uv" run ligm-report "$root/runs" --output "$results/training-summary.json"
