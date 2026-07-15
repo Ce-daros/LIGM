@@ -19,8 +19,8 @@ from ligm.masking import (
     random_word_mask,
     select_ligm_targets,
 )
-from ligm.scoring import information_gain_scores
 from ligm.rotary import use_torch_rotary
+from ligm.scoring import information_gain_scores
 
 
 def set_seed(seed: int) -> dict[str, torch.Generator]:
