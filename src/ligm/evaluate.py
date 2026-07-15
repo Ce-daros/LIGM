@@ -63,11 +63,12 @@ def synthetic_long_range(model_path: str, output: Path, samples_per_bucket: int 
             repeats = max(1, (target_distance - len(prefix)) // len(filler_ids))
             content = prefix + filler_ids * repeats + suffix
             content = content[:8190]
-            encoded = tokenizer.prepare_for_model(
-                content,
-                add_special_tokens=True,
-                return_tensors="pt",
-            )
+            encoded = {
+                "input_ids": torch.tensor(
+                    [[tokenizer.cls_token_id, *content, tokenizer.sep_token_id]]
+                ),
+                "attention_mask": torch.ones((1, len(content) + 2), dtype=torch.long),
+            }
             input_ids = encoded["input_ids"].to(device)
             mask_index = torch.where(input_ids[0] == tokenizer.mask_token_id)[0][-1]
             logits = model(**{key: value.to(device) for key, value in encoded.items()}).logits
