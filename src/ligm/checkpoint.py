@@ -15,7 +15,7 @@ def save_checkpoint(
     step: int,
     micro_step: int,
     tokens_seen: int,
-    generator: torch.Generator,
+    generators: dict[str, torch.Generator],
 ) -> None:
     target = Path(path)
     target.parent.mkdir(parents=True, exist_ok=True)
@@ -29,7 +29,9 @@ def save_checkpoint(
             "step": step,
             "micro_step": micro_step,
             "tokens_seen": tokens_seen,
-            "generator": generator.get_state(),
+            "generators": {
+                name: generator.get_state() for name, generator in generators.items()
+            },
             "torch_rng": torch.get_rng_state(),
             "cuda_rng": torch.cuda.get_rng_state_all() if torch.cuda.is_available() else None,
             "numpy_rng": np.random.get_state(),
@@ -46,7 +48,7 @@ def load_checkpoint(
     optimizer,
     scheduler,
     source,
-    generator: torch.Generator,
+    generators: dict[str, torch.Generator],
 ) -> dict[str, int]:
     state = torch.load(path, map_location="cpu", weights_only=False)
     model.load_state_dict(state["model"])
@@ -55,7 +57,8 @@ def load_checkpoint(
     optimizer.load_state_dict(state["optimizer"])
     scheduler.load_state_dict(state["scheduler"])
     source.load_state_dict(state["source"])
-    generator.set_state(state["generator"])
+    for name, generator in generators.items():
+        generator.set_state(state["generators"][name])
     torch.set_rng_state(state["torch_rng"])
     if torch.cuda.is_available():
         torch.cuda.set_rng_state_all(state["cuda_rng"])

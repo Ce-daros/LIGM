@@ -22,12 +22,15 @@ from ligm.masking import (
 from ligm.scoring import information_gain_scores
 
 
-def set_seed(seed: int) -> torch.Generator:
+def set_seed(seed: int) -> dict[str, torch.Generator]:
     torch.manual_seed(seed)
     np.random.seed(seed)
     if torch.cuda.is_available():
         torch.cuda.manual_seed_all(seed)
-    return torch.Generator().manual_seed(seed)
+    return {
+        "data": torch.Generator().manual_seed(seed),
+        "mask": torch.Generator().manual_seed(seed + 1),
+    }
 
 
 def create_scheduler(optimizer, total_steps: int, config) -> LambdaLR:
@@ -87,7 +90,7 @@ def train(config: RunConfig) -> Path:
     if not torch.cuda.is_available():
         raise RuntimeError("LIGM training requires a CUDA GPU")
     device = torch.device("cuda")
-    generator = set_seed(config.training.seed)
+    generators = set_seed(config.training.seed)
     output_dir = Path(config.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
     (output_dir / "resolved-config.json").write_text(
@@ -138,7 +141,7 @@ def train(config: RunConfig) -> Path:
             optimizer=optimizer,
             scheduler=scheduler,
             source=source,
-            generator=generator,
+            generators=generators,
         )
         step = restored["step"]
         micro_step = restored["micro_step"]
@@ -161,14 +164,14 @@ def train(config: RunConfig) -> Path:
             tokenizer,
             bucket.length,
             bucket.micro_batch_size,
-            generator,
+            generators["data"],
         )
         batch = type(batch)(
             input_ids=batch.input_ids.to(device),
             attention_mask=batch.attention_mask.to(device),
             word_ids=batch.word_ids,
         )
-        masked = build_masked_batch(config, teacher, batch, tokenizer, generator)
+        masked = build_masked_batch(config, teacher, batch, tokenizer, generators["mask"])
         output = model(
             input_ids=masked.input_ids,
             attention_mask=batch.attention_mask,
@@ -219,7 +222,7 @@ def train(config: RunConfig) -> Path:
                 step=step,
                 micro_step=micro_step,
                 tokens_seen=tokens_seen,
-                generator=generator,
+                generators=generators,
             )
             next_checkpoint += config.training.checkpoint_every_tokens
 
