@@ -1,0 +1,23 @@
+repo_id: jhu-clsp/ettin-extension-data
+revision: 996ec10f55ee16739389f4afc0993bbc28716fe5
+output: /nvme-data/ligm/data/ettin
+target_tokens: 1000000000
+streams:
+  - name: books
+    prefixes: [train/books/]
+    proportion: 0.30
+  - name: arxiv-pes2o
+    prefixes: [train/arxiv/, train/pes2o/]
+    proportion: 0.25
+  - name: dclm
+    prefixes: [train/dclm-dolmino/]
+    proportion: 0.20
+  - name: wikipedia
+    prefixes: [train/wikipedia/]
+    proportion: 0.10
+  - name: stackexchange
+    prefixes: [train/stackexchange-dolmino/]
+    proportion: 0.10
+  - name: code
+    prefixes: [train/starcoder/]
+    proportion: 0.05

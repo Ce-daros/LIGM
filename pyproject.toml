@@ -38,6 +38,7 @@ gpu = [
 
 [project.scripts]
 ligm-download = "ligm.download:main"
+ligm-snapshot = "ligm.snapshot:main"
 ligm-train = "ligm.train:main"
 ligm-evaluate = "ligm.evaluate:main"
 ligm-report = "ligm.report:main"
