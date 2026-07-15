@@ -159,7 +159,11 @@ def evaluate_mldr(config: dict, model_path: str, output: Path) -> dict:
     for query, indices in zip(queries, top_indices, strict=True):
         relevant = {passage["docid"] for passage in query["positive_passages"]}
         retrieved = [document_ids[index] for index in indices]
-        gains = [1 / math.log2(rank + 2) for rank, docid in enumerate(retrieved) if docid in relevant]
+        gains = [
+            1 / math.log2(rank + 2)
+            for rank, docid in enumerate(retrieved)
+            if docid in relevant
+        ]
         ideal = sum(1 / math.log2(rank + 2) for rank in range(min(10, len(relevant))))
         score = sum(gains) / ideal
         scores.append(score)
