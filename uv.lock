@@ -695,6 +695,7 @@ gpu = [
     { name = "flash-attn", marker = "sys_platform == 'linux'" },
     { name = "ninja" },
     { name = "packaging" },
+    { name = "setuptools" },
 ]
 
 [package.metadata]
@@ -712,6 +713,7 @@ requires-dist = [
     { name = "safetensors", specifier = ">=0.5.3" },
     { name = "scipy", specifier = ">=1.15" },
     { name = "sentence-transformers", specifier = ">=5.1" },
+    { name = "setuptools", marker = "extra == 'gpu'", specifier = ">=80" },
     { name = "torch", specifier = "==2.6.0" },
     { name = "torch-optimi", specifier = ">=0.3.3" },
     { name = "transformers", specifier = ">=4.57.6,<5" },
@@ -1451,6 +1453,15 @@ dependencies = [
 sdist = { url = "https://mirrors.aliyun.com/pypi/packages/f9/56/d2cb00765a6b15c994a7fccf20f9032f16e8193ca49147cb5155166ad744/sentence_transformers-5.6.0.tar.gz", hash = "sha256:0e7164d051e416c1853ade7c274ff52af3f9da0f4be7f0b83d734c27699e1057" }
 wheels = [
     { url = "https://mirrors.aliyun.com/pypi/packages/76/c1/dc1582b79e9a2eb0cddf9559cd9bcdff084f541d6fe881fdd9d98630dba7/sentence_transformers-5.6.0-py3-none-any.whl", hash = "sha256:d2075b5e687a1611005e20ab04a6846994d51adfcf39610aed066af3c0c0b81f" },
+]
+
+[[package]]
+name = "setuptools"
+version = "83.0.0"
+source = { registry = "https://mirrors.aliyun.com/pypi/simple/" }
+sdist = { url = "https://mirrors.aliyun.com/pypi/packages/34/26/f5d29e25ffdb535afef2d35cdb55b325298f96debd670da4c325e08d70f4/setuptools-83.0.0.tar.gz", hash = "sha256:025bccbbf0fa05b6192bc64ae1e7b16e001fd6d6d4d5de03c97b1c1ade523bef" }
+wheels = [
+    { url = "https://mirrors.aliyun.com/pypi/packages/5d/40/e1e72872c6354b306daef1703549e8e83b4d43cfea356311bf722a043752/setuptools-83.0.0-py3-none-any.whl", hash = "sha256:29b23c360f22f414dc7336bb39178cc7bcbf6021ed2733cde173f09dba19abb3" },
 ]
 
 [[package]]
