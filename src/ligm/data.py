@@ -133,23 +133,16 @@ def _encode_token_ids(
         start = int(torch.randint(len(token_ids) - content_length + 1, (), generator=generator))
         token_ids = token_ids[start : start + content_length]
     grouped = _word_ids_from_token_ids(token_ids, tokenizer)
-    prepared = tokenizer.prepare_for_model(
-        token_ids,
-        add_special_tokens=True,
-        max_length=length,
-        padding="max_length",
-        truncation=True,
-        return_attention_mask=True,
-        return_special_tokens_mask=True,
-    )
-    grouped_iter = iter(grouped)
-    word_ids = [
-        -1 if is_special else next(grouped_iter) for is_special in prepared["special_tokens_mask"]
-    ]
+    return _pack_modernbert(token_ids, grouped, tokenizer, length)
+
+
+def _pack_modernbert(token_ids, grouped, tokenizer, length: int) -> dict:
+    content = [tokenizer.cls_token_id, *token_ids, tokenizer.sep_token_id]
+    padding = length - len(content)
     return {
-        "input_ids": prepared["input_ids"],
-        "attention_mask": prepared["attention_mask"],
-        "word_ids": word_ids,
+        "input_ids": content + [tokenizer.pad_token_id] * padding,
+        "attention_mask": [1] * len(content) + [0] * padding,
+        "word_ids": [-1, *grouped, -1] + [-1] * padding,
     }
 
 
@@ -159,29 +152,13 @@ def _encode_document(sample, tokenizer, length: int, generator: torch.Generator)
     raw = tokenizer(sample, add_special_tokens=False, return_offsets_mapping=True)
     token_ids = raw["input_ids"]
     offsets = raw["offset_mapping"]
-    if len(token_ids) > length:
-        start = int(torch.randint(len(token_ids) - length + 1, (), generator=generator))
-        token_ids = token_ids[start : start + length]
-        offsets = offsets[start : start + length]
+    content_length = length - tokenizer.num_special_tokens_to_add(pair=False)
+    if len(token_ids) > content_length:
+        start = int(torch.randint(len(token_ids) - content_length + 1, (), generator=generator))
+        token_ids = token_ids[start : start + content_length]
+        offsets = offsets[start : start + content_length]
     grouped = _word_ids(sample, offsets)
-    prepared = tokenizer.prepare_for_model(
-        token_ids,
-        add_special_tokens=True,
-        max_length=length,
-        padding="max_length",
-        truncation=True,
-        return_attention_mask=True,
-        return_special_tokens_mask=True,
-    )
-    grouped_iter = iter(grouped)
-    word_ids = [
-        -1 if is_special else next(grouped_iter) for is_special in prepared["special_tokens_mask"]
-    ]
-    return {
-        "input_ids": prepared["input_ids"],
-        "attention_mask": prepared["attention_mask"],
-        "word_ids": word_ids,
-    }
+    return _pack_modernbert(token_ids, grouped, tokenizer, length)
 
 
 def next_encoded_batch(
