@@ -79,6 +79,8 @@ Run the paired first-stage experiments and focused evaluation:
 ```bash
 bash scripts/run_stage1.sh
 bash scripts/evaluate_stage1.sh
+# Only after mechanism-gate.json reports passed:
+bash scripts/run_stage1_conditionals.sh
 ```
 
 The stage-one gate uses only:
