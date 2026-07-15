@@ -6,9 +6,8 @@ import subprocess
 import time
 from pathlib import Path
 
-from safetensors.torch import load_file
 import torch
-
+from safetensors.torch import load_file
 
 ROOT = Path("/nvme-data/ligm")
 REPO = ROOT / "repo"
