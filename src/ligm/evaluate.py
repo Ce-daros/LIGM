@@ -6,6 +6,9 @@ import torch
 from scipy.stats import spearmanr
 from transformers import AutoModelForMaskedLM, AutoTokenizer
 
+from ligm.masking import IGNORE_INDEX
+from ligm.scoring import information_gain_scores
+
 DISTANCE_BUCKETS = ((128, 512), (512, 2048), (2048, 4096), (4096, 8192))
 
 
@@ -45,6 +48,7 @@ def synthetic_long_range(model_path: str, output: Path, samples_per_bucket: int 
         correct = 0
         observed_distances = []
         confidences = []
+        information_gains = []
         marker = markers[bucket_index]
         marker_id = tokenizer(marker, add_special_tokens=False).input_ids[0]
         prefix = tokenizer(f"The access marker is {marker}. ", add_special_tokens=False).input_ids
@@ -66,25 +70,40 @@ def synthetic_long_range(model_path: str, output: Path, samples_per_bucket: int 
             logits = model(**{key: value.to(device) for key, value in encoded.items()}).logits
             prediction = int(logits[0, mask_index].argmax())
             probability = float(logits[0, mask_index].float().softmax(-1)[marker_id])
+            labels = torch.full_like(input_ids, IGNORE_INDEX)
+            labels[0, mask_index] = marker_id
+            scores = information_gain_scores(
+                model,
+                input_ids,
+                encoded["attention_mask"].to(device),
+                labels,
+            )
             correct += prediction == marker_id
             observed_distances.append(int(mask_index) - len(prefix))
             confidences.append(probability)
+            information_gains.append(float(scores[0, mask_index]))
         results.append(
             {
                 "bucket": f"{low}-{high}",
                 "accuracy": correct / samples_per_bucket,
                 "mean_confidence": sum(confidences) / len(confidences),
+                "mean_information_gain": sum(information_gains) / len(information_gains),
                 "mean_distance": sum(observed_distances) / len(observed_distances),
             }
         )
-    correlation = spearmanr(
+    confidence_correlation = spearmanr(
         [item["mean_distance"] for item in results],
         [item["mean_confidence"] for item in results],
+    ).statistic
+    score_correlation = spearmanr(
+        [item["mean_distance"] for item in results],
+        [item["mean_information_gain"] for item in results],
     ).statistic
     report = {
         "model": model_path,
         "distance_buckets": results,
-        "distance_confidence_spearman": correlation,
+        "distance_confidence_spearman": confidence_correlation,
+        "distance_information_gain_spearman": score_correlation,
     }
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
