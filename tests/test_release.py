@@ -37,4 +37,5 @@ def test_model_card_reports_failed_gate_without_claiming_improvement(tmp_path):
     card = _model_card(run, results, "owner/model")
 
     assert "gate **did not pass**" in card
-    assert "A failed gate is a negative experimental result" in card
+    assert "A failed gate is a negative experimental" in card
+    assert "result, not evidence of improved long-document retrieval" in card
