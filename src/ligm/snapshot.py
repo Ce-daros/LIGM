@@ -10,7 +10,13 @@ import requests
 import yaml
 from huggingface_hub import HfApi
 
-from ligm.download import Artifact, run_aria, verify_artifacts, write_aria_manifest
+from ligm.download import (
+    Artifact,
+    pending_artifacts,
+    run_aria,
+    verify_artifacts,
+    write_aria_manifest,
+)
 
 TOKENS_PER_SAMPLE = 8000
 
@@ -73,7 +79,12 @@ def build_snapshot(config_path: Path) -> None:
     siblings = {item.rfilename: item for item in info.siblings}
     paths = set(siblings)
     manifest_artifacts: list[Artifact] = []
-    snapshot_metadata: dict = {"repo_id": repo_id, "revision": revision, "streams": {}}
+    snapshot_metadata: dict = {
+        "repo_id": repo_id,
+        "revision": revision,
+        "target_tokens": target_tokens,
+        "streams": {},
+    }
 
     for spec in specs:
         token_quota = round(target_tokens * spec.proportion)
@@ -131,10 +142,16 @@ def build_snapshot(config_path: Path) -> None:
 
     manifest = output / "snapshot.aria2.txt"
     write_aria_manifest(manifest, output, manifest_artifacts)
+    snapshot_metadata["realized_tokens"] = sum(
+        stream["tokens"] for stream in snapshot_metadata["streams"].values()
+    )
     (output / "snapshot.json").write_text(
         json.dumps(snapshot_metadata, indent=2) + "\n", encoding="utf-8"
     )
-    run_aria(manifest, dataset=True)
+    pending = pending_artifacts(output, manifest_artifacts)
+    if pending:
+        write_aria_manifest(manifest, output, pending)
+        run_aria(manifest, dataset=True)
     verify_artifacts(output, manifest_artifacts)
 
 
