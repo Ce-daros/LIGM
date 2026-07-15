@@ -30,7 +30,7 @@ dev = [
   "ruff>=0.12",
 ]
 gpu = [
-  "flash-attn>=2.8.3; platform_system == 'Linux'",
+  "flash-attn==2.8.3; platform_system == 'Linux'",
   "ninja>=1.11",
   "packaging>=25",
   "setuptools>=80",
