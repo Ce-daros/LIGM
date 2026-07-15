@@ -151,7 +151,10 @@ def train(config: RunConfig) -> Path:
     optimizer.zero_grad(set_to_none=True)
     interval_start = time.perf_counter()
     interval_tokens = 0
-    while tokens_seen < config.training.max_tokens:
+    while (
+        tokens_seen < config.training.max_tokens
+        or micro_step % config.training.gradient_accumulation != 0
+    ):
         bucket = schedule.at(micro_step)
         batch = next_encoded_batch(
             source,
@@ -202,7 +205,10 @@ def train(config: RunConfig) -> Path:
                 interval_tokens = 0
                 torch.cuda.reset_peak_memory_stats()
 
-        if tokens_seen >= next_checkpoint:
+        if (
+            tokens_seen >= next_checkpoint
+            and micro_step % config.training.gradient_accumulation == 0
+        ):
             save_checkpoint(
                 output_dir / "checkpoints" / f"tokens-{tokens_seen}.pt",
                 model=model,
