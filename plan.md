@@ -108,7 +108,7 @@ Hugging Face Hub 自身也支持自定义 endpoint、local cache 和并发下载
 配置固定为：
 
 - BF16
-- 长度比例：50% × 2048、30% × 4096、20% × 8192
+- 长度比例：50% × 2048、30% × 4096、20% × 8000（Ettin MDS 原生样本长度）
 - micro-batch：4/2/1
 - gradient accumulation：4
 - gradient checkpointing：开启

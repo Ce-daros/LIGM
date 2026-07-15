@@ -6,11 +6,11 @@ data:
 training:
   method: random
   seed: 11
-  max_tokens: 8192
+  max_tokens: 8000
   gradient_accumulation: 1
-  checkpoint_every_tokens: 8192
+  checkpoint_every_tokens: 8000
   log_every_steps: 1
   buckets:
-    - length: 8192
+    - length: 8000
       micro_batch_size: 1
       slots: 1

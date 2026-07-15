@@ -37,7 +37,6 @@ training:
     - length: 4096
       micro_batch_size: 2
       slots: 3
-    - length: 8192
+    - length: 8000
       micro_batch_size: 1
       slots: 2
-
