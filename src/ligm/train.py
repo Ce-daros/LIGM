@@ -119,6 +119,8 @@ def train(config: RunConfig) -> Path:
         model.parameters(),
         lr=config.training.learning_rate,
         weight_decay=config.training.weight_decay,
+        foreach=True,
+        triton=False,
     )
     tokens_per_cycle = sum(
         bucket.length * bucket.micro_batch_size * bucket.slots for bucket in config.training.buckets
