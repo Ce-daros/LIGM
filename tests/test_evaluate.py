@@ -4,7 +4,7 @@ from ligm.evaluate import _repetition_buckets
 
 
 def test_repetition_buckets_separate_local_and_long_evidence():
-    input_ids = torch.tensor([11, 12, 11, *range(13, 522), 12])
+    input_ids = torch.tensor([11, 12, 11, *range(13, 523), 12])
     attention_mask = torch.ones_like(input_ids)
     word_ids = torch.arange(input_ids.numel())
     selected = torch.zeros_like(input_ids, dtype=torch.bool)
