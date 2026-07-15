@@ -27,3 +27,4 @@ uv="$HOME/.local/bin/uv"
 "$uv" run ligm-evaluate "$root/runs/stage1-ligm-seed11/final" \
   --natural-config configs/stage1-random.yaml --output "$results/ligm-natural.json"
 "$uv" run ligm-report "$root/runs" --output "$results/training-summary.json"
+"$uv" run ligm-gate "$results" --output "$results/mechanism-gate.json"
