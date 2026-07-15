@@ -21,6 +21,7 @@ class DataStreamConfig:
 @dataclass(frozen=True)
 class DataConfig:
     kind: str = "synthetic"
+    split: str = "train"
     cache_limit: str = "220gb"
     streams: tuple[DataStreamConfig, ...] = ()
 
@@ -72,6 +73,8 @@ def load_config(path: str | Path) -> RunConfig:
     config = RunConfig(data=data, training=training, **raw)
     if training.method not in {"ligm", "random"}:
         raise ValueError(f"Unsupported method: {training.method}")
+    if data.split not in {"train", "validation", "test"}:
+        raise ValueError(f"Unsupported data split: {data.split}")
     if abs(training.warmup_ratio + training.stable_ratio - 0.85) > 1e-9:
         raise ValueError("Warmup and stable ratios must sum to 0.85")
     return config

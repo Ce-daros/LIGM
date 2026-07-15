@@ -1,3 +1,4 @@
+import hashlib
 from collections.abc import Iterator, Mapping
 from dataclasses import dataclass
 
@@ -64,25 +65,41 @@ class MDSDocumentSource:
         )
         self.iterator: Iterator = iter(self.dataset)
         self.samples_seen = 0
+        self.samples_consumed = 0
+        self.split = config.split
 
     def __iter__(self) -> "MDSDocumentSource":
         return self
 
     def __next__(self) -> Mapping:
-        sample = next(self.iterator)
-        self.samples_seen += 1
-        return sample
+        while True:
+            sample = next(self.iterator)
+            self.samples_consumed += 1
+            if document_split(sample["id"]) == self.split:
+                self.samples_seen += 1
+                return sample
 
     def state_dict(self) -> dict:
         return {
             "samples_seen": self.samples_seen,
-            "dataset": self.dataset.state_dict(self.samples_seen, False),
+            "samples_consumed": self.samples_consumed,
+            "dataset": self.dataset.state_dict(self.samples_consumed, False),
         }
 
     def load_state_dict(self, state: dict) -> None:
         self.samples_seen = int(state["samples_seen"])
+        self.samples_consumed = int(state["samples_consumed"])
         self.dataset.load_state_dict(state["dataset"])
         self.iterator = iter(self.dataset)
+
+
+def document_split(document_id: str) -> str:
+    bucket = int.from_bytes(hashlib.sha256(document_id.encode()).digest()[:8], "big") % 100
+    if bucket < 98:
+        return "train"
+    if bucket == 98:
+        return "validation"
+    return "test"
 
 
 def create_document_source(config: DataConfig, seed: int, batch_size: int):
