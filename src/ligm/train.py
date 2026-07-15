@@ -1,6 +1,5 @@
 import argparse
 import json
-import math
 import time
 from pathlib import Path
 
@@ -34,31 +33,31 @@ def set_seed(seed: int) -> dict[str, torch.Generator]:
     }
 
 
-def create_scheduler(optimizer, total_steps: int, config) -> LambdaLR:
-    warmup_steps = max(1, round(total_steps * config.warmup_ratio))
-    stable_end = round(total_steps * (config.warmup_ratio + config.stable_ratio))
+def create_scheduler(optimizer, total_tokens: int, config) -> LambdaLR:
+    warmup_tokens = max(1, round(total_tokens * config.warmup_ratio))
+    stable_end = round(total_tokens * (config.warmup_ratio + config.stable_ratio))
 
-    def scale(step: int) -> float:
-        if step < warmup_steps:
-            return step / warmup_steps
-        if step < stable_end:
+    def scale(tokens_seen: int) -> float:
+        if tokens_seen < warmup_tokens:
+            return tokens_seen / warmup_tokens
+        if tokens_seen < stable_end:
             return 1.0
-        decay_steps = max(1, total_steps - stable_end)
-        return max(0.0, 1.0 - (step - stable_end) / decay_steps)
+        decay_tokens = max(1, total_tokens - stable_end)
+        return max(0.0, 1.0 - (tokens_seen - stable_end) / decay_tokens)
 
     return LambdaLR(optimizer, scale)
 
 
-def rebase_scheduler(scheduler: LambdaLR, step: int) -> None:
+def rebase_scheduler(scheduler: LambdaLR, tokens_seen: int) -> None:
     learning_rates = [
-        base_lr * schedule(step)
+        base_lr * schedule(tokens_seen)
         for base_lr, schedule in zip(scheduler.base_lrs, scheduler.lr_lambdas, strict=True)
     ]
     for group, learning_rate in zip(
         scheduler.optimizer.param_groups, learning_rates, strict=True
     ):
         group["lr"] = learning_rate
-    scheduler.last_epoch = step
+    scheduler.last_epoch = tokens_seen
     scheduler._last_lr = learning_rates
 
 
@@ -150,14 +149,7 @@ def train(config: RunConfig) -> Path:
         foreach=True,
         triton=False,
     )
-    tokens_per_cycle = sum(
-        bucket.length * bucket.micro_batch_size * bucket.slots for bucket in config.training.buckets
-    )
-    slots_per_cycle = sum(bucket.slots for bucket in config.training.buckets)
-    tokens_per_micro_step = tokens_per_cycle / slots_per_cycle
-    tokens_per_update = tokens_per_micro_step * config.training.gradient_accumulation
-    total_updates = math.ceil(config.training.max_tokens / tokens_per_update)
-    scheduler = create_scheduler(optimizer, total_updates, config.training)
+    scheduler = create_scheduler(optimizer, config.training.max_tokens, config.training)
     schedule = SequenceSchedule(config.training.buckets)
     largest_batch = max(bucket.micro_batch_size for bucket in config.training.buckets)
     source = create_document_source(config.data, config.training.seed, largest_batch)
@@ -184,7 +176,7 @@ def train(config: RunConfig) -> Path:
             tokens_seen // config.training.checkpoint_every_tokens + 1
         ) * config.training.checkpoint_every_tokens
         last_checkpoint_tokens = tokens_seen
-        rebase_scheduler(scheduler, step)
+        rebase_scheduler(scheduler, tokens_seen)
 
     metric_path = output_dir / "metrics.jsonl"
     optimizer.zero_grad(set_to_none=True)
@@ -222,7 +214,7 @@ def train(config: RunConfig) -> Path:
         micro_step += 1
         if micro_step % config.training.gradient_accumulation == 0:
             optimizer.step()
-            scheduler.step()
+            rebase_scheduler(scheduler, tokens_seen)
             optimizer.zero_grad(set_to_none=True)
             if teacher is not None:
                 teacher.update(model)

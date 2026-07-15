@@ -26,3 +26,16 @@ def test_scheduler_rebase_immediately_sets_extended_schedule_rate() -> None:
     rebase_scheduler(scheduler, 50)
 
     assert optimizer.param_groups[0]["lr"] == 2e-5
+
+
+def test_scheduler_boundaries_are_measured_in_tokens() -> None:
+    parameter = torch.nn.Parameter(torch.ones(()))
+    optimizer = SGD([parameter], lr=2e-5)
+    scheduler = create_scheduler(optimizer, 100, TrainingConfig())
+
+    rebase_scheduler(scheduler, 1)
+    assert optimizer.param_groups[0]["lr"] == 1e-5
+    rebase_scheduler(scheduler, 85)
+    assert optimizer.param_groups[0]["lr"] == 2e-5
+    rebase_scheduler(scheduler, 100)
+    assert optimizer.param_groups[0]["lr"] == 0.0
