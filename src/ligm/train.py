@@ -117,8 +117,12 @@ def train(config: RunConfig) -> Path:
     generators = set_seed(config.training.seed)
     output_dir = Path(config.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
-    (output_dir / "resolved-config.json").write_text(
-        json.dumps(config, default=lambda value: value.__dict__, indent=2) + "\n",
+    resolved = json.dumps(config, default=lambda value: value.__dict__, indent=2) + "\n"
+    (output_dir / "resolved-config.json").write_text(resolved, encoding="utf-8")
+    history = output_dir / "config-history"
+    history.mkdir(exist_ok=True)
+    (history / f"tokens-{config.training.max_tokens}.json").write_text(
+        resolved,
         encoding="utf-8",
     )
 
