@@ -1,0 +1,42 @@
+model_path: /nvme-data/ligm/models/ModernBERT-base
+output_dir: /nvme-data/ligm/runs/stage1-ligm-gain-seed11
+attention_implementation: flash_attention_2
+data:
+  kind: mds
+  cache_limit: 220gb
+  streams:
+    - remote: /nvme-data/ligm/data/ettin/books
+      local: /nvme-data/ligm/cache/books
+      proportion: 0.30
+    - remote: /nvme-data/ligm/data/ettin/arxiv-pes2o
+      local: /nvme-data/ligm/cache/arxiv-pes2o
+      proportion: 0.25
+    - remote: /nvme-data/ligm/data/ettin/dclm
+      local: /nvme-data/ligm/cache/dclm
+      proportion: 0.20
+    - remote: /nvme-data/ligm/data/ettin/wikipedia
+      local: /nvme-data/ligm/cache/wikipedia
+      proportion: 0.10
+    - remote: /nvme-data/ligm/data/ettin/stackexchange
+      local: /nvme-data/ligm/cache/stackexchange
+      proportion: 0.10
+    - remote: /nvme-data/ligm/data/ettin/code
+      local: /nvme-data/ligm/cache/code
+      proportion: 0.05
+training:
+  method: ligm_gain
+  seed: 11
+  max_tokens: 100000000
+  gradient_accumulation: 4
+  checkpoint_every_tokens: 25000000
+  log_every_steps: 10
+  buckets:
+    - length: 2048
+      micro_batch_size: 4
+      slots: 5
+    - length: 4096
+      micro_batch_size: 2
+      slots: 3
+    - length: 8000
+      micro_batch_size: 1
+      slots: 2

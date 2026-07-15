@@ -20,6 +20,7 @@ def information_gain_scores(
     candidate_input_ids: Tensor,
     attention_mask: Tensor,
     candidate_labels: Tensor,
+    learnability: bool = True,
 ) -> Tensor:
     teacher.eval()
     global_output = teacher(
@@ -35,7 +36,31 @@ def information_gain_scores(
         )
     global_log_p, global_p = _true_log_probabilities(global_output.logits, candidate_labels)
     local_log_p, _ = _true_log_probabilities(local_output.logits, candidate_labels)
-    flat_scores = (global_log_p - local_log_p).clamp_min(0) * 4 * global_p * (1 - global_p)
+    flat_scores = (global_log_p - local_log_p).clamp_min(0)
+    if learnability:
+        flat_scores = flat_scores * 4 * global_p * (1 - global_p)
     scores = torch.zeros_like(candidate_labels, dtype=torch.float32)
     scores[candidate_labels != IGNORE_INDEX] = flat_scores
+    return scores
+
+
+@torch.no_grad()
+def entropy_scores(
+    teacher: nn.Module,
+    candidate_input_ids: Tensor,
+    attention_mask: Tensor,
+    candidate_labels: Tensor,
+) -> Tensor:
+    teacher.eval()
+    output = teacher(
+        input_ids=candidate_input_ids,
+        attention_mask=attention_mask,
+        labels=candidate_labels,
+    )
+    selected = candidate_labels != IGNORE_INDEX
+    selected_logits = output.logits[selected] if output.logits.ndim == 3 else output.logits
+    log_probabilities = selected_logits.float().log_softmax(dim=-1)
+    flat_scores = -(log_probabilities.exp() * log_probabilities).sum(dim=-1)
+    scores = torch.zeros_like(candidate_labels, dtype=torch.float32)
+    scores[selected] = flat_scores
     return scores

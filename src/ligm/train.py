@@ -20,7 +20,7 @@ from ligm.masking import (
     select_ligm_targets,
 )
 from ligm.rotary import use_torch_rotary
-from ligm.scoring import information_gain_scores
+from ligm.scoring import entropy_scores, information_gain_scores
 
 
 def set_seed(seed: int) -> dict[str, torch.Generator]:
@@ -64,12 +64,21 @@ def build_masked_batch(config: RunConfig, teacher, batch, tokenizer, generator):
         tokenizer.mask_token_id,
         generator,
     )
-    scores = information_gain_scores(
-        teacher.model,
-        candidates.input_ids,
-        batch.attention_mask,
-        candidates.labels,
-    )
+    if config.training.method == "entropy":
+        scores = entropy_scores(
+            teacher.model,
+            candidates.input_ids,
+            batch.attention_mask,
+            candidates.labels,
+        )
+    else:
+        scores = information_gain_scores(
+            teacher.model,
+            candidates.input_ids,
+            batch.attention_mask,
+            candidates.labels,
+            learnability=config.training.method == "ligm",
+        )
     return select_ligm_targets(
         batch.input_ids,
         batch.word_ids,
@@ -113,7 +122,9 @@ def train(config: RunConfig) -> Path:
     model.train()
 
     teacher = (
-        EMATeacher(model, config.training.ema_decay) if config.training.method == "ligm" else None
+        EMATeacher(model, config.training.ema_decay)
+        if config.training.method != "random"
+        else None
     )
     optimizer = StableAdamW(
         model.parameters(),

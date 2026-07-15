@@ -73,7 +73,7 @@ def load_config(path: str | Path) -> RunConfig:
     data = DataConfig(**data_raw, streams=streams)
     training = _training_config(raw.pop("training"))
     config = RunConfig(data=data, training=training, **raw)
-    if training.method not in {"ligm", "random"}:
+    if training.method not in {"ligm", "ligm_gain", "entropy", "random"}:
         raise ValueError(f"Unsupported method: {training.method}")
     if data.split not in {"train", "validation", "test"}:
         raise ValueError(f"Unsupported data split: {data.split}")
