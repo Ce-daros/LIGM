@@ -6,8 +6,8 @@ import subprocess
 import time
 from pathlib import Path
 
-import torch
 from safetensors.torch import load_file
+import torch
 
 
 ROOT = Path("/nvme-data/ligm")
