@@ -4,6 +4,23 @@ import numpy as np
 import torch
 
 
+def prune_checkpoints(path: str | Path, keep_recent: int, keep_every: int) -> None:
+    directory = Path(path)
+    checkpoints = sorted(
+        directory.glob("tokens-*.pt"),
+        key=lambda item: int(item.stem.removeprefix("tokens-")),
+    )
+    milestones = {
+        checkpoint
+        for index, checkpoint in enumerate(checkpoints, start=1)
+        if index % keep_every == 0
+    }
+    retained = milestones | set(checkpoints[-keep_recent:])
+    for checkpoint in checkpoints:
+        if checkpoint not in retained:
+            checkpoint.unlink()
+
+
 def save_checkpoint(
     path: str | Path,
     *,

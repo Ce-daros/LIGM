@@ -10,7 +10,7 @@ from optimi import StableAdamW
 from torch.optim.lr_scheduler import LambdaLR
 from transformers import AutoModelForMaskedLM, AutoTokenizer
 
-from ligm.checkpoint import load_checkpoint, save_checkpoint
+from ligm.checkpoint import load_checkpoint, prune_checkpoints, save_checkpoint
 from ligm.config import RunConfig, load_config
 from ligm.data import SequenceSchedule, create_document_source, next_encoded_batch
 from ligm.ema import EMATeacher
@@ -228,6 +228,11 @@ def train(config: RunConfig) -> Path:
                 micro_step=micro_step,
                 tokens_seen=tokens_seen,
                 generators=generators,
+            )
+            prune_checkpoints(
+                output_dir / "checkpoints",
+                config.training.keep_recent_checkpoints,
+                config.training.keep_every_checkpoints,
             )
             next_checkpoint += config.training.checkpoint_every_tokens
 

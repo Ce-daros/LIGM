@@ -38,6 +38,8 @@ class TrainingConfig:
     warmup_ratio: float = 0.02
     stable_ratio: float = 0.83
     checkpoint_every_tokens: int = 25_000_000
+    keep_recent_checkpoints: int = 2
+    keep_every_checkpoints: int = 4
     log_every_steps: int = 10
     buckets: tuple[SequenceBucket, ...] = field(
         default_factory=lambda: (
