@@ -6,8 +6,10 @@ from ligm.masking import IGNORE_INDEX
 
 
 def _true_log_probabilities(logits: Tensor, labels: Tensor) -> tuple[Tensor, Tensor]:
-    flat_labels = labels[labels != IGNORE_INDEX]
-    log_probs = logits.float().log_softmax(dim=-1)
+    selected = labels != IGNORE_INDEX
+    flat_labels = labels[selected]
+    selected_logits = logits[selected] if logits.ndim == 3 else logits
+    log_probs = selected_logits.float().log_softmax(dim=-1)
     true_log_probs = log_probs.gather(1, flat_labels.unsqueeze(1)).squeeze(1)
     return true_log_probs, true_log_probs.exp()
 
