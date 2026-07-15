@@ -40,3 +40,26 @@ def test_ligm_prefers_high_scoring_word_groups() -> None:
         assert selected.selected[0, 10]
     assert not selected.selected[0, 0]
     assert not selected.selected[0, -1]
+
+
+def test_ligm_uses_exact_candidate_target_and_replay_ratios_for_single_token_words():
+    input_ids = torch.arange(102).reshape(1, 102)
+    word_ids = torch.tensor([[-1, *range(100), -1]])
+    generator = torch.Generator().manual_seed(11)
+    candidates = candidate_word_mask(input_ids, word_ids, 999, generator)
+    scores = torch.arange(102, dtype=torch.float32).reshape(1, 102)
+    selected = select_ligm_targets(
+        input_ids,
+        word_ids,
+        candidates.candidates,
+        scores,
+        999,
+        1000,
+        generator,
+    )
+
+    candidate_positions = torch.where(candidates.candidates[0])[0]
+    highest_scoring = candidate_positions[torch.argsort(scores[0, candidate_positions])[-20:]]
+    assert candidates.candidates.sum() == 40
+    assert selected.selected.sum() == 30
+    assert selected.selected[0, highest_scoring].all()

@@ -9,6 +9,7 @@ class _Attention:
 class _Layer:
     def __init__(self, window):
         self.attn = _Attention(window)
+        self.rotary = object()
 
 
 class _Config:
@@ -27,9 +28,11 @@ class _Model:
 def test_all_local_context_restores_layer_windows() -> None:
     model = _Model()
     original = [layer.attn.local_attention for layer in model.model.layers]
+    rotary_ids = [id(layer.rotary) for layer in model.model.layers]
     with all_local_attention(model):
         assert [layer.attn.local_attention for layer in model.model.layers] == [
             (64, 64),
             (64, 64),
         ]
+        assert [id(layer.rotary) for layer in model.model.layers] == rotary_ids
     assert [layer.attn.local_attention for layer in model.model.layers] == original
