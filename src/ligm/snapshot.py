@@ -31,19 +31,14 @@ def _read_index(endpoint: str, repo_id: str, revision: str, path: str) -> dict:
 
 
 def _leaf_indexes(paths: set[str], prefix: str) -> list[str]:
-    result: list[str] = []
-    for path in paths:
-        if not path.endswith("/index.json") or not path.startswith(prefix):
-            continue
-        directory = path.removesuffix("/index.json")
-        direct_files = [
-            candidate.removeprefix(directory)
-            for candidate in paths
-            if candidate.startswith(directory) and candidate != path
-        ]
-        if any(name.count("/") == 1 and name.endswith(".mds") for name in direct_files):
-            result.append(path)
-    return sorted(result)
+    mds_directories = {path.rsplit("/", 1)[0] for path in paths if path.endswith(".mds")}
+    return sorted(
+        path
+        for path in paths
+        if path.endswith("/index.json")
+        and path.startswith(prefix)
+        and path.rsplit("/", 1)[0] in mds_directories
+    )
 
 
 def _interleaved_indexes(paths: set[str], prefixes: tuple[str, ...]) -> list[str]:
