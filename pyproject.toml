@@ -1,0 +1,65 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "ligm"
+version = "0.1.0"
+description = "Long-range Information-Gain Masking for ModernBERT"
+readme = "README.md"
+requires-python = ">=3.11,<3.12"
+license = { text = "Apache-2.0" }
+authors = [{ name = "Ame" }]
+dependencies = [
+  "huggingface-hub>=0.34,<1.0",
+  "mosaicml-streaming>=0.13.0",
+  "numpy>=2.1",
+  "pyyaml>=6.0.2",
+  "safetensors>=0.5.3",
+  "scipy>=1.15",
+  "sentence-transformers>=5.1",
+  "torch>=2.6",
+  "torch-optimi>=0.3.3",
+  "transformers>=4.57.6,<5",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.4",
+  "pytest-cov>=6.2",
+  "ruff>=0.12",
+]
+gpu = [
+  "flash-attn>=2.8.3; platform_system == 'Linux'",
+  "ninja>=1.11",
+  "packaging>=25",
+]
+
+[project.scripts]
+ligm-download = "ligm.download:main"
+ligm-train = "ligm.train:main"
+ligm-evaluate = "ligm.evaluate:main"
+ligm-report = "ligm.report:main"
+
+[[tool.uv.index]]
+name = "aliyun"
+url = "https://mirrors.aliyun.com/pypi/simple/"
+default = true
+
+[tool.uv]
+no-build-isolation-package = ["flash-attn"]
+find-links = ["https://mirrors.aliyun.com/pytorch-wheels/cu124/"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/ligm"]
+
+[tool.pytest.ini_options]
+addopts = "-q"
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
