@@ -13,9 +13,9 @@ from sentence_transformers import (
     SentenceTransformerTrainer,
     SentenceTransformerTrainingArguments,
 )
-from sentence_transformers.losses import MultipleNegativesRankingLoss
+from sentence_transformers.sentence_transformer.losses import MultipleNegativesRankingLoss
 from sentence_transformers.sentence_transformer.modules import Normalize, Pooling, Transformer
-from sentence_transformers.training_args import BatchSamplers
+from sentence_transformers.sentence_transformer.training_args import BatchSamplers
 
 from ligm.rotary import use_torch_rotary
 
