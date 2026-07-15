@@ -41,6 +41,7 @@ ligm-download = "ligm.download:main"
 ligm-snapshot = "ligm.snapshot:main"
 ligm-train = "ligm.train:main"
 ligm-evaluate = "ligm.evaluate:main"
+ligm-integration = "ligm.integration:main"
 ligm-report = "ligm.report:main"
 
 [[tool.uv.index]]
