@@ -32,12 +32,13 @@ def synthetic_long_range(model_path: str, output: Path, samples_per_bucket: int 
         AutoModelForMaskedLM.from_pretrained(
             model_path,
             local_files_only=True,
-            torch_dtype=torch.bfloat16,
+            dtype=torch.bfloat16,
             attn_implementation="flash_attention_2",
         )
         .to(device)
         .eval()
     )
+    model.config.reference_compile = False
     markers = _single_token_words(tokenizer, 4)
     filler_ids = tokenizer(
         "The intervening document contains unrelated explanatory material. ",

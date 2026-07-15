@@ -12,9 +12,10 @@ def verify_attention_counterfactual(model_path: str) -> float:
     model = AutoModelForMaskedLM.from_pretrained(
         model_path,
         local_files_only=True,
-        torch_dtype=torch.bfloat16,
+        dtype=torch.bfloat16,
         attn_implementation="flash_attention_2",
     ).cuda()
+    model.config.reference_compile = False
     encoded = tokenizer(
         "The short sequence must fit entirely inside the local attention window.",
         return_tensors="pt",

@@ -102,9 +102,10 @@ def train(config: RunConfig) -> Path:
     model = AutoModelForMaskedLM.from_pretrained(
         config.model_path,
         local_files_only=True,
-        torch_dtype=torch.bfloat16,
+        dtype=torch.bfloat16,
         attn_implementation=config.attention_implementation,
     ).to(device)
+    model.config.reference_compile = False
     model.config.sparse_prediction = True
     model.gradient_checkpointing_enable()
     model.train()
