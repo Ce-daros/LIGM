@@ -49,6 +49,19 @@ def create_scheduler(optimizer, total_steps: int, config) -> LambdaLR:
     return LambdaLR(optimizer, scale)
 
 
+def rebase_scheduler(scheduler: LambdaLR, step: int) -> None:
+    learning_rates = [
+        base_lr * schedule(step)
+        for base_lr, schedule in zip(scheduler.base_lrs, scheduler.lr_lambdas, strict=True)
+    ]
+    for group, learning_rate in zip(
+        scheduler.optimizer.param_groups, learning_rates, strict=True
+    ):
+        group["lr"] = learning_rate
+    scheduler.last_epoch = step
+    scheduler._last_lr = learning_rates
+
+
 def build_masked_batch(config: RunConfig, teacher, batch, tokenizer, generator):
     if config.training.method == "random":
         return random_word_mask(
@@ -149,6 +162,7 @@ def train(config: RunConfig) -> Path:
     micro_step = 0
     tokens_seen = 0
     next_checkpoint = config.training.checkpoint_every_tokens
+    last_checkpoint_tokens = 0
     if config.resume_from:
         restored = load_checkpoint(
             config.resume_from,
@@ -165,6 +179,8 @@ def train(config: RunConfig) -> Path:
         next_checkpoint = (
             tokens_seen // config.training.checkpoint_every_tokens + 1
         ) * config.training.checkpoint_every_tokens
+        last_checkpoint_tokens = tokens_seen
+        rebase_scheduler(scheduler, step)
 
     metric_path = output_dir / "metrics.jsonl"
     optimizer.zero_grad(set_to_none=True)
@@ -245,7 +261,27 @@ def train(config: RunConfig) -> Path:
                 config.training.keep_recent_checkpoints,
                 config.training.keep_every_checkpoints,
             )
+            last_checkpoint_tokens = tokens_seen
             next_checkpoint += config.training.checkpoint_every_tokens
+
+    if last_checkpoint_tokens != tokens_seen:
+        save_checkpoint(
+            output_dir / "checkpoints" / f"tokens-{tokens_seen}.pt",
+            model=model,
+            teacher=teacher,
+            optimizer=optimizer,
+            scheduler=scheduler,
+            source=source,
+            step=step,
+            micro_step=micro_step,
+            tokens_seen=tokens_seen,
+            generators=generators,
+        )
+        prune_checkpoints(
+            output_dir / "checkpoints",
+            config.training.keep_recent_checkpoints,
+            config.training.keep_every_checkpoints,
+        )
 
     final_dir = output_dir / "final"
     model.save_pretrained(final_dir, safe_serialization=True)
