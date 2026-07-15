@@ -11,7 +11,7 @@ from ligm.config import load_config
 from ligm.data import create_document_source, next_encoded_batch
 from ligm.masking import IGNORE_INDEX, random_word_mask
 from ligm.rotary import use_torch_rotary
-from ligm.scoring import information_gain_scores
+from ligm.scoring import information_gain_statistics
 
 DISTANCE_BUCKETS = ((128, 512), (512, 2048), (2048, 4096), (4096, 8192))
 
@@ -79,17 +79,16 @@ def synthetic_long_range(model_path: str, output: Path, samples_per_bucket: int 
             }
             input_ids = encoded["input_ids"].to(device)
             mask_index = torch.where(input_ids[0] == tokenizer.mask_token_id)[0][-1]
-            logits = model(**{key: value.to(device) for key, value in encoded.items()}).logits
-            prediction = int(logits[0, mask_index].argmax())
-            probability = float(logits[0, mask_index].float().softmax(-1)[marker_id])
             labels = torch.full_like(input_ids, IGNORE_INDEX)
             labels[0, mask_index] = marker_id
-            scores = information_gain_scores(
+            scores, global_logits = information_gain_statistics(
                 model,
                 input_ids,
                 encoded["attention_mask"].to(device),
                 labels,
             )
+            prediction = int(global_logits[0].argmax())
+            probability = float(global_logits[0].float().softmax(-1)[marker_id])
             correct += prediction == marker_id
             observed_distances.append(int(mask_index) - len(prefix))
             confidences.append(probability)

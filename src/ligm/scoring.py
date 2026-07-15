@@ -15,13 +15,13 @@ def _true_log_probabilities(logits: Tensor, labels: Tensor) -> tuple[Tensor, Ten
 
 
 @torch.no_grad()
-def information_gain_scores(
+def information_gain_statistics(
     teacher: nn.Module,
     candidate_input_ids: Tensor,
     attention_mask: Tensor,
     candidate_labels: Tensor,
     learnability: bool = True,
-) -> Tensor:
+) -> tuple[Tensor, Tensor]:
     teacher.eval()
     global_output = teacher(
         input_ids=candidate_input_ids,
@@ -41,6 +41,29 @@ def information_gain_scores(
         flat_scores = flat_scores * 4 * global_p * (1 - global_p)
     scores = torch.zeros_like(candidate_labels, dtype=torch.float32)
     scores[candidate_labels != IGNORE_INDEX] = flat_scores
+    selected = candidate_labels != IGNORE_INDEX
+    global_logits = (
+        global_output.logits[selected]
+        if global_output.logits.ndim == 3
+        else global_output.logits
+    )
+    return scores, global_logits
+
+
+def information_gain_scores(
+    teacher: nn.Module,
+    candidate_input_ids: Tensor,
+    attention_mask: Tensor,
+    candidate_labels: Tensor,
+    learnability: bool = True,
+) -> Tensor:
+    scores, _ = information_gain_statistics(
+        teacher,
+        candidate_input_ids,
+        attention_mask,
+        candidate_labels,
+        learnability,
+    )
     return scores
 
 
