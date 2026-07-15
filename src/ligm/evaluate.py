@@ -182,7 +182,9 @@ def natural_repetition_recovery(
         ).logits
         selected = masked.selected[0].cpu()
         predictions = logits[0, selected.cuda()].argmax(-1).cpu()
-        predicted_by_position = dict(zip(torch.where(selected)[0].tolist(), predictions.tolist()))
+        predicted_by_position = dict(
+            zip(torch.where(selected)[0].tolist(), predictions.tolist(), strict=True)
+        )
         for position, bucket in _repetition_buckets(
             original_ids,
             batch.attention_mask[0],
