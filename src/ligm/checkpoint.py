@@ -36,6 +36,7 @@ def save_checkpoint(
 ) -> None:
     target = Path(path)
     target.parent.mkdir(parents=True, exist_ok=True)
+    temporary = target.with_suffix(".tmp")
     torch.save(
         {
             "model": model.state_dict(),
@@ -53,8 +54,9 @@ def save_checkpoint(
             "cuda_rng": torch.cuda.get_rng_state_all() if torch.cuda.is_available() else None,
             "numpy_rng": np.random.get_state(),
         },
-        target,
+        temporary,
     )
+    temporary.replace(target)
 
 
 def load_checkpoint(

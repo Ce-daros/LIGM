@@ -1,0 +1,16 @@
+model_path: /nvme-data/ligm/models/ModernBERT-base
+output_dir: /nvme-data/ligm/runs/smoke-resume-interrupted
+attention_implementation: flash_attention_2
+data:
+  kind: synthetic
+training:
+  method: ligm
+  seed: 11
+  max_tokens: 65536
+  gradient_accumulation: 1
+  checkpoint_every_tokens: 32768
+  log_every_steps: 1
+  buckets:
+    - length: 2048
+      micro_batch_size: 1
+      slots: 1
