@@ -3,7 +3,6 @@ import json
 import shutil
 from pathlib import Path
 
-
 MODEL_FILES = (
     "config.json",
     "model.safetensors",
@@ -26,6 +25,7 @@ def _model_card(run: Path, results: Path, repo_id: str) -> str:
     mldr_path = results / "ligm-mldr.json"
     mldr = _read(mldr_path) if mldr_path.exists() else None
     gate_label = "passed" if gate["passed"] else "did not pass"
+    mean_throughput = sum(item["tokens_per_second"] for item in metrics) / len(metrics)
     distance_rows = "\n".join(
         f"| {item['bucket']} | {item['accuracy']:.4f} | "
         f"{item['mean_information_gain']:.6f} |"
@@ -91,7 +91,7 @@ encoder for retrieval or classification before using it for those tasks.
 - Precision: BF16
 - Optimizer: StableAdamW
 - Peak allocated GPU memory: `{max(item['peak_memory_gib'] for item in metrics):.2f}` GiB
-- Mean measured throughput: `{sum(item['tokens_per_second'] for item in metrics) / len(metrics):.0f}` token/s
+- Mean measured throughput: `{mean_throughput:.0f}` token/s
 - Seed: `{config['training']['seed']}`
 - Hardware: one NVIDIA RTX 3090 24GB
 
