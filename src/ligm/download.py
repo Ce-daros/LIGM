@@ -107,6 +107,23 @@ def verify_artifacts(output: Path, artifacts: list[Artifact]) -> None:
                 raise RuntimeError(f"SHA256 mismatch: {path}")
 
 
+def pending_artifacts(output: Path, artifacts: list[Artifact]) -> list[Artifact]:
+    pending: list[Artifact] = []
+    for artifact in artifacts:
+        path = output / artifact.relative_path
+        if not path.exists() or artifact.size is None or path.stat().st_size != artifact.size:
+            pending.append(artifact)
+            continue
+        if artifact.sha256:
+            digest = hashlib.sha256()
+            with path.open("rb") as handle:
+                for chunk in iter(lambda: handle.read(8 * 1024 * 1024), b""):
+                    digest.update(chunk)
+            if digest.hexdigest() != artifact.sha256:
+                pending.append(artifact)
+    return pending
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("repo_type", choices=["model", "dataset"])
@@ -119,12 +136,21 @@ def main() -> None:
     args = parser.parse_args()
 
     endpoint = os.environ.get("HF_ENDPOINT", "https://hf-mirror.com")
+    includes = tuple(args.include)
+    if args.repo_type == "model" and not includes:
+        includes = (
+            "config.json",
+            "model.safetensors",
+            "tokenizer.json",
+            "tokenizer_config.json",
+            "special_tokens_map.json",
+        )
     commit, artifacts = resolve_artifacts(
         args.repo_id,
         args.repo_type,
         endpoint,
         args.revision,
-        tuple(args.include),
+        includes,
     )
     manifest = args.manifest or args.output.with_suffix(".aria2.txt")
     write_aria_manifest(manifest, args.output, artifacts)
@@ -139,7 +165,10 @@ def main() -> None:
         json.dumps(metadata, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
     )
     if not args.resolve_only:
-        run_aria(manifest, args.repo_type == "dataset")
+        pending = pending_artifacts(args.output, artifacts)
+        if pending:
+            write_aria_manifest(manifest, args.output, pending)
+            run_aria(manifest, args.repo_type == "dataset")
         verify_artifacts(args.output, artifacts)
 
 
