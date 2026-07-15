@@ -12,6 +12,8 @@ from huggingface_hub import HfApi
 
 from ligm.download import Artifact, run_aria, verify_artifacts, write_aria_manifest
 
+TOKENS_PER_SAMPLE = 8000
+
 
 @dataclass(frozen=True)
 class StreamSpec:
@@ -75,7 +77,7 @@ def build_snapshot(config_path: Path) -> None:
 
     for spec in specs:
         token_quota = round(target_tokens * spec.proportion)
-        sample_quota = (token_quota + 8191) // 8192
+        sample_quota = (token_quota + TOKENS_PER_SAMPLE - 1) // TOKENS_PER_SAMPLE
         selected_shards: list[dict] = []
         selected_samples = 0
         stream_artifacts: list[Artifact] = []
@@ -122,7 +124,7 @@ def build_snapshot(config_path: Path) -> None:
         snapshot_metadata["streams"][spec.name] = {
             "proportion": spec.proportion,
             "samples": selected_samples,
-            "tokens": selected_samples * 8192,
+            "tokens": selected_samples * TOKENS_PER_SAMPLE,
             "shards": len(selected_shards),
         }
         manifest_artifacts.extend(stream_artifacts)

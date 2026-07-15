@@ -113,7 +113,9 @@ def _word_ids_from_token_ids(token_ids: list[int], tokenizer) -> list[int]:
     word_ids: list[int] = []
     current = -1
     for token in tokens:
-        if token.startswith(("Ġ", "▁")) or current < 0:
+        piece = token.lstrip("Ġ▁")
+        is_punctuation = piece and not any(character.isalnum() for character in piece)
+        if token.startswith(("Ġ", "▁")) or is_punctuation or current < 0:
             current += 1
         word_ids.append(current)
     return word_ids
@@ -122,6 +124,10 @@ def _word_ids_from_token_ids(token_ids: list[int], tokenizer) -> list[int]:
 def _encode_token_ids(
     token_ids: list[int], tokenizer, length: int, generator: torch.Generator
 ) -> dict:
+    while token_ids and token_ids[0] in tokenizer.all_special_ids:
+        token_ids = token_ids[1:]
+    while token_ids and token_ids[-1] in tokenizer.all_special_ids:
+        token_ids = token_ids[:-1]
     content_length = length - tokenizer.num_special_tokens_to_add(pair=False)
     if len(token_ids) > content_length:
         start = int(torch.randint(len(token_ids) - content_length + 1, (), generator=generator))
