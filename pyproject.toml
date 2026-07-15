@@ -11,6 +11,7 @@ requires-python = ">=3.11,<3.12"
 license = { text = "Apache-2.0" }
 authors = [{ name = "Ame" }]
 dependencies = [
+  "datasets>=4.0,<5",
   "huggingface-hub>=0.34,<1.0",
   "mosaicml-streaming>=0.13.0",
   "numpy>=2.1",
@@ -43,6 +44,7 @@ ligm-train = "ligm.train:main"
 ligm-evaluate = "ligm.evaluate:main"
 ligm-integration = "ligm.integration:main"
 ligm-report = "ligm.report:main"
+ligm-retrieval = "ligm.retrieval:main"
 
 [[tool.uv.index]]
 name = "aliyun"

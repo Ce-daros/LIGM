@@ -1,0 +1,11 @@
+seed: 11
+triplet_parquet: /nvme-data/ligm/data/msmarco/triplet/train-00000-of-00001.parquet
+train_examples: 250000
+train_max_seq_length: 512
+batch_size: 16
+learning_rate: 2.0e-5
+mldr_corpus: /nvme-data/ligm/data/mldr/mldr-v1.0-en/corpus.jsonl.gz
+mldr_dev: /nvme-data/ligm/data/mldr/mldr-v1.0-en/dev.jsonl.gz
+mldr_corpus_size: 200000
+eval_max_seq_length: 8192
+eval_batch_size: 4
