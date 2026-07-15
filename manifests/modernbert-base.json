@@ -1,0 +1,38 @@
+{
+  "repo_id": "answerdotai/ModernBERT-base",
+  "repo_type": "model",
+  "endpoint": "https://hf-mirror.com",
+  "commit": "8949b909ec900327062f0ebf497f51aef5e6f0c8",
+  "files": [
+    {
+      "url": "https://hf-mirror.com/answerdotai/ModernBERT-base/resolve/8949b909ec900327062f0ebf497f51aef5e6f0c8/config.json",
+      "relative_path": "config.json",
+      "sha256": null,
+      "size": 1193
+    },
+    {
+      "url": "https://hf-mirror.com/answerdotai/ModernBERT-base/resolve/8949b909ec900327062f0ebf497f51aef5e6f0c8/model.safetensors",
+      "relative_path": "model.safetensors",
+      "sha256": "340ac08b74eef0d7bdec2d7981a6a3d4249bf0e6aab60634b72ad02c2b8023a9",
+      "size": 598635032
+    },
+    {
+      "url": "https://hf-mirror.com/answerdotai/ModernBERT-base/resolve/8949b909ec900327062f0ebf497f51aef5e6f0c8/special_tokens_map.json",
+      "relative_path": "special_tokens_map.json",
+      "sha256": null,
+      "size": 694
+    },
+    {
+      "url": "https://hf-mirror.com/answerdotai/ModernBERT-base/resolve/8949b909ec900327062f0ebf497f51aef5e6f0c8/tokenizer.json",
+      "relative_path": "tokenizer.json",
+      "sha256": null,
+      "size": 2132967
+    },
+    {
+      "url": "https://hf-mirror.com/answerdotai/ModernBERT-base/resolve/8949b909ec900327062f0ebf497f51aef5e6f0c8/tokenizer_config.json",
+      "relative_path": "tokenizer_config.json",
+      "sha256": null,
+      "size": 20810
+    }
+  ]
+}

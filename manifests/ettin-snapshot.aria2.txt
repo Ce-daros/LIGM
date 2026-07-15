@@ -1,0 +1,96 @@
+https://hf-mirror.com/datasets/jhu-clsp/ettin-extension-data/resolve/996ec10f55ee16739389f4afc0993bbc28716fe5/train/books/books_0001/shard.00000.mds
+  dir=/nvme-data/ligm/data/ettin/books
+  out=train__books__books_0001__shard.00000.mds
+  checksum=sha-256=74a04b9744497fd52ebb42f57f01e7a20fa3576798e4b9c28cd4329c7f8d727d
+https://hf-mirror.com/datasets/jhu-clsp/ettin-extension-data/resolve/996ec10f55ee16739389f4afc0993bbc28716fe5/train/books/books_0001/shard.00001.mds
+  dir=/nvme-data/ligm/data/ettin/books
+  out=train__books__books_0001__shard.00001.mds
+  checksum=sha-256=be46d784352f2c40b1014ee134888786b06fbec7d0853221fd21dd3015ce0fba
+https://hf-mirror.com/datasets/jhu-clsp/ettin-extension-data/resolve/996ec10f55ee16739389f4afc0993bbc28716fe5/train/books/books_0001/shard.00002.mds
+  dir=/nvme-data/ligm/data/ettin/books
+  out=train__books__books_0001__shard.00002.mds
+  checksum=sha-256=282041716f915bb4f2382904342d2bed8eda1f4777d488dea4c0f803cf07f082
+https://hf-mirror.com/datasets/jhu-clsp/ettin-extension-data/resolve/996ec10f55ee16739389f4afc0993bbc28716fe5/train/books/books_0001/shard.00003.mds
+  dir=/nvme-data/ligm/data/ettin/books
+  out=train__books__books_0001__shard.00003.mds
+  checksum=sha-256=5ae1a4a1f7931cb56cdf5ff7d77e7f0f24a9548acf304547c630863d422a39ba
+https://hf-mirror.com/datasets/jhu-clsp/ettin-extension-data/resolve/996ec10f55ee16739389f4afc0993bbc28716fe5/train/books/books_0001/shard.00004.mds
+  dir=/nvme-data/ligm/data/ettin/books
+  out=train__books__books_0001__shard.00004.mds
+  checksum=sha-256=2ea5d76731dafeeb8b07f90eb63d6861d318968908dcc57c0a3f3f68b4005011
+https://hf-mirror.com/datasets/jhu-clsp/ettin-extension-data/resolve/996ec10f55ee16739389f4afc0993bbc28716fe5/train/books/books_0001/shard.00005.mds
+  dir=/nvme-data/ligm/data/ettin/books
+  out=train__books__books_0001__shard.00005.mds
+  checksum=sha-256=1f6f5b5bae9395baaa0777b707fb11123b3f974e599ad815f6d775b4d8f85e08
+https://hf-mirror.com/datasets/jhu-clsp/ettin-extension-data/resolve/996ec10f55ee16739389f4afc0993bbc28716fe5/train/books/books_0001/shard.00006.mds
+  dir=/nvme-data/ligm/data/ettin/books
+  out=train__books__books_0001__shard.00006.mds
+  checksum=sha-256=c9b520622d6de87d02581d6d831fa0d23dfac178be2dd68e07fc0369e051817a
+https://hf-mirror.com/datasets/jhu-clsp/ettin-extension-data/resolve/996ec10f55ee16739389f4afc0993bbc28716fe5/train/books/books_0001/shard.00007.mds
+  dir=/nvme-data/ligm/data/ettin/books
+  out=train__books__books_0001__shard.00007.mds
+  checksum=sha-256=fe6689d4a22f621815d104844e81ff3995ff6a1d6c67f5f1eefc6dd9e2a393ca
+https://hf-mirror.com/datasets/jhu-clsp/ettin-extension-data/resolve/996ec10f55ee16739389f4afc0993bbc28716fe5/train/books/books_0001/shard.00008.mds
+  dir=/nvme-data/ligm/data/ettin/books
+  out=train__books__books_0001__shard.00008.mds
+  checksum=sha-256=54c9822407296a13233edd8b74d70718c8f518d13d163cac339b0230e26f35b5
+https://hf-mirror.com/datasets/jhu-clsp/ettin-extension-data/resolve/996ec10f55ee16739389f4afc0993bbc28716fe5/train/arxiv/arxiv_0004/shard.00000.mds
+  dir=/nvme-data/ligm/data/ettin/arxiv-pes2o
+  out=train__arxiv__arxiv_0004__shard.00000.mds
+  checksum=sha-256=36e2ef92e23a89938cfc73ab8480b95cd42a21880e562c29737647dac09714d0
+https://hf-mirror.com/datasets/jhu-clsp/ettin-extension-data/resolve/996ec10f55ee16739389f4afc0993bbc28716fe5/train/arxiv/arxiv_0004/shard.00001.mds
+  dir=/nvme-data/ligm/data/ettin/arxiv-pes2o
+  out=train__arxiv__arxiv_0004__shard.00001.mds
+  checksum=sha-256=3eaeef59bde91fe273e3152a8ec7ad62fc09725736b9c05ea463d319d5c85c35
+https://hf-mirror.com/datasets/jhu-clsp/ettin-extension-data/resolve/996ec10f55ee16739389f4afc0993bbc28716fe5/train/arxiv/arxiv_0004/shard.00002.mds
+  dir=/nvme-data/ligm/data/ettin/arxiv-pes2o
+  out=train__arxiv__arxiv_0004__shard.00002.mds
+  checksum=sha-256=f33faf1360c67fb196151d97b26ccabc3fa32848e14344f06db1b7d562e85df5
+https://hf-mirror.com/datasets/jhu-clsp/ettin-extension-data/resolve/996ec10f55ee16739389f4afc0993bbc28716fe5/train/arxiv/arxiv_0004/shard.00003.mds
+  dir=/nvme-data/ligm/data/ettin/arxiv-pes2o
+  out=train__arxiv__arxiv_0004__shard.00003.mds
+  checksum=sha-256=b4a31e06d809d8300b619f52565d466b55b5cde88a3554acc10f82c9d7537865
+https://hf-mirror.com/datasets/jhu-clsp/ettin-extension-data/resolve/996ec10f55ee16739389f4afc0993bbc28716fe5/train/arxiv/arxiv_0004/shard.00004.mds
+  dir=/nvme-data/ligm/data/ettin/arxiv-pes2o
+  out=train__arxiv__arxiv_0004__shard.00004.mds
+  checksum=sha-256=ad3a80f370a18a28b41695aa81ba08efba1fc752a5f3f6bb9c031abbd445cb6f
+https://hf-mirror.com/datasets/jhu-clsp/ettin-extension-data/resolve/996ec10f55ee16739389f4afc0993bbc28716fe5/train/arxiv/arxiv_0004/shard.00005.mds
+  dir=/nvme-data/ligm/data/ettin/arxiv-pes2o
+  out=train__arxiv__arxiv_0004__shard.00005.mds
+  checksum=sha-256=3e246eae1adb4ff4949ffcb34d221ec99be54214e07dfd1125e89aeb7ca8ba5a
+https://hf-mirror.com/datasets/jhu-clsp/ettin-extension-data/resolve/996ec10f55ee16739389f4afc0993bbc28716fe5/train/arxiv/arxiv_0004/shard.00006.mds
+  dir=/nvme-data/ligm/data/ettin/arxiv-pes2o
+  out=train__arxiv__arxiv_0004__shard.00006.mds
+  checksum=sha-256=c3df5b15859d062071c9317e11f17c1e878676d1b2ec25b7b124bf3444640466
+https://hf-mirror.com/datasets/jhu-clsp/ettin-extension-data/resolve/996ec10f55ee16739389f4afc0993bbc28716fe5/train/arxiv/arxiv_0004/shard.00007.mds
+  dir=/nvme-data/ligm/data/ettin/arxiv-pes2o
+  out=train__arxiv__arxiv_0004__shard.00007.mds
+  checksum=sha-256=0d8a182f4b921cc14c4bfefe8257b4365f7a177eb68f29dc5c74bff122c68a31
+https://hf-mirror.com/datasets/jhu-clsp/ettin-extension-data/resolve/996ec10f55ee16739389f4afc0993bbc28716fe5/train/dclm-dolmino/split_0-tokenized-chunked-8000-512-128-backfill-nodups/shard.00000.mds
+  dir=/nvme-data/ligm/data/ettin/dclm
+  out=train__dclm-dolmino__split_0-tokenized-chunked-8000-512-128-backfill-nodups__shard.00000.mds
+  checksum=sha-256=6d910c482605ba6701c2e013362223217ed6f46ea5c3f53e07321d4c7de34ad9
+https://hf-mirror.com/datasets/jhu-clsp/ettin-extension-data/resolve/996ec10f55ee16739389f4afc0993bbc28716fe5/train/wikipedia/wiki_0000/shard.00000.mds
+  dir=/nvme-data/ligm/data/ettin/wikipedia
+  out=train__wikipedia__wiki_0000__shard.00000.mds
+  checksum=sha-256=309509106e7452db43e9d56f06f7106c6923e5e5402b3b7915f8b108d231c593
+https://hf-mirror.com/datasets/jhu-clsp/ettin-extension-data/resolve/996ec10f55ee16739389f4afc0993bbc28716fe5/train/wikipedia/wiki_0000/shard.00001.mds
+  dir=/nvme-data/ligm/data/ettin/wikipedia
+  out=train__wikipedia__wiki_0000__shard.00001.mds
+  checksum=sha-256=059f4ea9a821c2312b2f7e58ee4dc7845b654a7f7a65e171e3bebffb3a02e909
+https://hf-mirror.com/datasets/jhu-clsp/ettin-extension-data/resolve/996ec10f55ee16739389f4afc0993bbc28716fe5/train/wikipedia/wiki_0000/shard.00002.mds
+  dir=/nvme-data/ligm/data/ettin/wikipedia
+  out=train__wikipedia__wiki_0000__shard.00002.mds
+  checksum=sha-256=74376440564c55edcbd09221adf80462da4a4f33183d346c75c6f0805bb99a36
+https://hf-mirror.com/datasets/jhu-clsp/ettin-extension-data/resolve/996ec10f55ee16739389f4afc0993bbc28716fe5/train/stackexchange-dolmino/split_0-tokenized-chunked-8000-512-128-backfill-nodups/shard.00000.mds
+  dir=/nvme-data/ligm/data/ettin/stackexchange
+  out=train__stackexchange-dolmino__split_0-tokenized-chunked-8000-512-128-backfill-nodups__shard.00000.mds
+  checksum=sha-256=b5d05caf7811d2445a315d14ed073d7fcebfbc2f1e92992bcd6a72f0a2493099
+https://hf-mirror.com/datasets/jhu-clsp/ettin-extension-data/resolve/996ec10f55ee16739389f4afc0993bbc28716fe5/train/starcoder/starcoder_0001/shard.00000.mds
+  dir=/nvme-data/ligm/data/ettin/code
+  out=train__starcoder__starcoder_0001__shard.00000.mds
+  checksum=sha-256=acab2f1294ed3a4424af45da33e1bc5620c15b6e17337b2b351fca3d87b59fbe
+https://hf-mirror.com/datasets/jhu-clsp/ettin-extension-data/resolve/996ec10f55ee16739389f4afc0993bbc28716fe5/train/starcoder/starcoder_0001/shard.00001.mds
+  dir=/nvme-data/ligm/data/ettin/code
+  out=train__starcoder__starcoder_0001__shard.00001.mds
+  checksum=sha-256=04c2b5810cedaa0bbe0fe90496dd92253ea1d3416bba47507b255a12cb236ef8

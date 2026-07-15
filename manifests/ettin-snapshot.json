@@ -1,0 +1,42 @@
+{
+  "repo_id": "jhu-clsp/ettin-extension-data",
+  "revision": "996ec10f55ee16739389f4afc0993bbc28716fe5",
+  "streams": {
+    "books": {
+      "proportion": 0.3,
+      "samples": 37611,
+      "tokens": 300888000,
+      "shards": 9
+    },
+    "arxiv-pes2o": {
+      "proportion": 0.25,
+      "samples": 40015,
+      "tokens": 320120000,
+      "shards": 8
+    },
+    "dclm": {
+      "proportion": 0.2,
+      "samples": 25388,
+      "tokens": 203104000,
+      "shards": 1
+    },
+    "wikipedia": {
+      "proportion": 0.1,
+      "samples": 12760,
+      "tokens": 102080000,
+      "shards": 3
+    },
+    "stackexchange": {
+      "proportion": 0.1,
+      "samples": 30013,
+      "tokens": 240104000,
+      "shards": 1
+    },
+    "code": {
+      "proportion": 0.05,
+      "samples": 8376,
+      "tokens": 67008000,
+      "shards": 2
+    }
+  }
+}

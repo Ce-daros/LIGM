@@ -60,6 +60,8 @@ The Ettin snapshot contains six streams and preserves document boundaries.
 Documents are assigned to train, validation, and test at 98/1/1 by a stable hash
 of the document ID. Data-crop and mask random-number generators are independent,
 so random MLM and LIGM consume identical documents and crop offsets.
+The realized shard selection and base-model checksums are stored in
+[`manifests/`](manifests/).
 
 ## Training
 
