@@ -46,6 +46,7 @@ ligm-evaluate = "ligm.evaluate:main"
 ligm-gate = "ligm.gate:main"
 ligm-integration = "ligm.integration:main"
 ligm-report = "ligm.report:main"
+ligm-release = "ligm.release:main"
 ligm-retrieval = "ligm.retrieval:main"
 
 [[tool.uv.index]]
