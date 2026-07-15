@@ -50,6 +50,9 @@ default = true
 no-build-isolation-package = ["flash-attn"]
 find-links = ["https://mirrors.aliyun.com/pytorch-wheels/cu124/"]
 
+[tool.uv.extra-build-dependencies]
+flash-attn = ["setuptools", "torch"]
+
 [tool.hatch.build.targets.wheel]
 packages = ["src/ligm"]
 
