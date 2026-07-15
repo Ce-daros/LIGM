@@ -7,6 +7,7 @@ from scipy.stats import spearmanr
 from transformers import AutoModelForMaskedLM, AutoTokenizer
 
 from ligm.masking import IGNORE_INDEX
+from ligm.rotary import use_torch_rotary
 from ligm.scoring import information_gain_scores
 
 DISTANCE_BUCKETS = ((128, 512), (512, 2048), (2048, 4096), (4096, 8192))
@@ -27,6 +28,7 @@ def _single_token_words(tokenizer, count: int) -> list[str]:
 @torch.no_grad()
 def synthetic_long_range(model_path: str, output: Path, samples_per_bucket: int = 32) -> dict:
     device = torch.device("cuda")
+    use_torch_rotary()
     tokenizer = AutoTokenizer.from_pretrained(model_path, local_files_only=True)
     model = (
         AutoModelForMaskedLM.from_pretrained(

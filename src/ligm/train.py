@@ -20,6 +20,7 @@ from ligm.masking import (
     select_ligm_targets,
 )
 from ligm.scoring import information_gain_scores
+from ligm.rotary import use_torch_rotary
 
 
 def set_seed(seed: int) -> dict[str, torch.Generator]:
@@ -90,6 +91,7 @@ def train(config: RunConfig) -> Path:
     if not torch.cuda.is_available():
         raise RuntimeError("LIGM training requires a CUDA GPU")
     device = torch.device("cuda")
+    use_torch_rotary()
     generators = set_seed(config.training.seed)
     output_dir = Path(config.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)

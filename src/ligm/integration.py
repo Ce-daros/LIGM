@@ -4,10 +4,12 @@ import torch
 from transformers import AutoModelForMaskedLM, AutoTokenizer
 
 from ligm.attention import all_local_attention
+from ligm.rotary import use_torch_rotary
 
 
 @torch.no_grad()
 def verify_attention_counterfactual(model_path: str) -> float:
+    use_torch_rotary()
     tokenizer = AutoTokenizer.from_pretrained(model_path, local_files_only=True)
     model = AutoModelForMaskedLM.from_pretrained(
         model_path,
