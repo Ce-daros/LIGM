@@ -31,16 +31,17 @@ def _load_model(model_path: str):
     return model
 
 
-def _single_token_words(tokenizer, count: int) -> list[str]:
-    words = []
+def _single_token_markers(tokenizer, count: int) -> list[tuple[str, int]]:
+    markers = []
     for word in ("cobalt", "amber", "violet", "silver", "crimson", "indigo", "coral"):
-        if len(tokenizer(word, add_special_tokens=False).input_ids) == 1:
-            words.append(word)
-        if len(words) == count:
+        token_ids = tokenizer(f" {word}", add_special_tokens=False).input_ids
+        if len(token_ids) == 1:
+            markers.append((word, token_ids[0]))
+        if len(markers) == count:
             break
-    if len(words) < count:
+    if len(markers) < count:
         raise RuntimeError("Tokenizer does not provide enough single-token marker words")
-    return words
+    return markers
 
 
 @torch.no_grad()
@@ -49,7 +50,7 @@ def synthetic_long_range(model_path: str, output: Path, samples_per_bucket: int 
     use_torch_rotary()
     tokenizer = AutoTokenizer.from_pretrained(model_path, local_files_only=True)
     model = _load_model(model_path)
-    markers = _single_token_words(tokenizer, 4)
+    markers = _single_token_markers(tokenizer, 4)
     filler_ids = tokenizer(
         "The intervening document contains unrelated explanatory material. ",
         add_special_tokens=False,
@@ -60,10 +61,11 @@ def synthetic_long_range(model_path: str, output: Path, samples_per_bucket: int 
         observed_distances = []
         confidences = []
         information_gains = []
-        marker = markers[bucket_index]
-        marker_id = tokenizer(marker, add_special_tokens=False).input_ids[0]
+        marker, marker_id = markers[bucket_index]
         prefix = tokenizer(f"The access marker is {marker}. ", add_special_tokens=False).input_ids
-        suffix = tokenizer(" The access marker is ", add_special_tokens=False).input_ids + [
+        if prefix.count(marker_id) != 1:
+            raise RuntimeError("Marker token does not round-trip in the synthetic prefix")
+        suffix = tokenizer(" The access marker is", add_special_tokens=False).input_ids + [
             tokenizer.mask_token_id
         ]
         for sample_index in range(samples_per_bucket):
