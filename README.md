@@ -102,6 +102,35 @@ uv run ligm-retrieval evaluate configs/retrieval-probe.yaml RETRIEVER_PATH \
 GLUE, BEIR, MLDR-ID, code retrieval, ColBERT, and broad hyperparameter sweeps are
 outside this protocol.
 
+## Exploratory online extension
+
+The original first-stage decision remains a failed gate. A dated amendment in
+[`plan.md`](plan.md) defines a separate exploratory extension with a 1B-token
+upper bound. It does not retroactively change the first-stage thresholds.
+
+The token-matched random curve is trained first. Both methods pause every 25M
+tokens and evaluate the same 128 held-out documents with the same mask seed. For
+LIGM, training stops immediately when local recovery is more than 0.5 percentage
+points below random MLM at the identical token count. The final model is then
+restored from the preceding safe checkpoint.
+
+```bash
+uv run ligm-train configs/stage2-online-random.yaml
+bash scripts/continue_stage2_ligm.sh
+```
+
+`continue_stage2_ligm.sh` starts LIGM only after the random run has produced a
+valid 1B selection report. It then builds paired document-bootstrap confidence
+intervals and evaluates retained 100M/250M/500M/750M/1B checkpoints. Raw
+per-document reports remain under each run's `online-evaluation/` directory.
+
+The hard-stop path is covered by a deterministic integration configuration:
+
+```bash
+uv run ligm-train configs/smoke-online-random.yaml
+uv run ligm-train configs/smoke-online-stop.yaml
+```
+
 ## Current status
 
 - [x] Revision-pinned model and 1B-token long-document snapshot
@@ -112,7 +141,10 @@ outside this protocol.
 - [x] Stage-one random-MLM baseline: 100,006,238 tokens
 - [x] Stage-one LIGM run: 100,006,238 tokens
 - [x] Stage-one gate decision: did not pass
-- [x] Stage two stopped by the pre-registered rule
+- [x] Pre-registered stage two stopped by the original rule
+- [x] Exploratory online guard and safe-checkpoint rollback verified
+- [ ] Exploratory 1B random reference curve
+- [ ] Exploratory online LIGM extension
 - [ ] Hugging Face checkpoint and finalized model card
 
 ## Stage-one result
@@ -126,9 +158,25 @@ distance buckets increased from 13.281% to 26.562%, but the information-gain
 score did not increase monotonically with distance (Spearman rho `-0.8`).
 
 The first-stage gate therefore failed two of three mechanism checks. Conditional
-ablations, retrieval evaluation, and stage-two scaling were not run. This is a
-negative result under the frozen protocol, despite the synthetic accuracy gain.
-Machine-readable reports are committed in [`results/`](results/).
+ablations, retrieval evaluation, and pre-registered stage-two scaling were not
+run. This is a negative result under the frozen protocol, despite the synthetic
+accuracy gain. Machine-readable reports are committed in [`results/`](results/).
+
+## Release
+
+After the exploratory run and selection report complete, build, upload, and
+verify the model repository from the RTX workstation:
+
+```bash
+bash scripts/build_hf_release.sh
+bash scripts/publish_hf.sh raincandy-u/ModernBERT-base-LIGM \
+  /nvme-data/ligm/release/ModernBERT-base-LIGM
+bash scripts/verify_hf_release.sh
+```
+
+The release contains standard Transformers weights and tokenizer files, the
+model card, resolved configuration, manifests, original first-stage reports,
+the complete online curve, and all per-document online evaluation reports.
 
 ## License
 
