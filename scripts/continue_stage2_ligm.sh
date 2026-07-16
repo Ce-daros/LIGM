@@ -7,7 +7,7 @@ random_run="$root/runs/stage1-random-seed11"
 selection="$random_run/online-evaluation/selection.json"
 
 while [[ ! -f "$selection" ]]; do
-  if ! pgrep -f 'ligm-train configs/stage2-online-random.yaml' >/dev/null; then
+  if ! pgrep -f 'ligm-train .*random.*\.yaml' >/dev/null; then
     echo "Random reference run exited without a selection report" >&2
     exit 1
   fi
