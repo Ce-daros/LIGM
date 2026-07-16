@@ -13,6 +13,7 @@ from ligm.checkpoint import load_checkpoint, prune_checkpoints, save_checkpoint
 from ligm.config import RunConfig, load_config
 from ligm.data import SequenceSchedule, create_document_source, next_encoded_batch
 from ligm.ema import EMATeacher
+from ligm.evaluate import natural_repetition_recovery_model
 from ligm.masking import (
     candidate_word_mask,
     random_word_mask,
@@ -20,6 +21,7 @@ from ligm.masking import (
 )
 from ligm.rotary import use_torch_rotary
 from ligm.scoring import entropy_scores, information_gain_scores
+from ligm.online import compare_local_recovery, read_report
 
 
 def set_seed(seed: int) -> dict[str, torch.Generator]:
@@ -108,6 +110,48 @@ def _append_metric(path: Path, metric: dict) -> None:
         handle.write(json.dumps(metric, ensure_ascii=False) + "\n")
 
 
+def _run_online_evaluation(
+    config: RunConfig,
+    model,
+    tokenizer,
+    tokens_seen: int,
+) -> dict:
+    evaluation_dir = Path(config.output_dir) / "online-evaluation"
+    report_path = evaluation_dir / f"tokens-{tokens_seen}-natural.json"
+    torch.cuda.empty_cache()
+    report = natural_repetition_recovery_model(
+        model,
+        tokenizer,
+        config.data,
+        report_path,
+        config.online_evaluation.documents,
+        config.output_dir,
+    )
+    report["tokens_seen"] = tokens_seen
+    reference_dir = config.online_evaluation.reference_dir
+    if reference_dir:
+        reference_path = Path(reference_dir) / report_path.name
+        comparison = compare_local_recovery(
+            report,
+            read_report(reference_path),
+            config.online_evaluation.max_local_drop,
+        )
+        comparison["reference"] = str(reference_path)
+    else:
+        comparison = {"mode": "reference", "passed": True}
+    report["local_guard"] = comparison
+    report_path.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
+    _append_metric(
+        evaluation_dir / "events.jsonl",
+        {
+            "tokens_seen": tokens_seen,
+            "report": str(report_path),
+            "local_guard": comparison,
+        },
+    )
+    return comparison
+
+
 def train(config: RunConfig) -> Path:
     if not torch.cuda.is_available():
         raise RuntimeError("LIGM training requires a CUDA GPU")
@@ -179,12 +223,28 @@ def train(config: RunConfig) -> Path:
         rebase_scheduler(scheduler, tokens_seen)
 
     metric_path = output_dir / "metrics.jsonl"
+    stop_requested = False
+    last_safe_checkpoint: Path | None = None
+    selected_checkpoint: Path | None = None
+    if config.online_evaluation.enabled:
+        if not config.resume_from:
+            raise ValueError("Online evaluation requires a resume checkpoint")
+        initial_checkpoint = Path(config.resume_from)
+        initial_guard = _run_online_evaluation(config, model, tokenizer, tokens_seen)
+        if initial_guard["passed"]:
+            last_safe_checkpoint = initial_checkpoint
+        else:
+            stop_requested = True
+            selected_checkpoint = initial_checkpoint
+
     optimizer.zero_grad(set_to_none=True)
     interval_start = time.perf_counter()
     interval_tokens = 0
     while (
-        tokens_seen < config.training.max_tokens
+        not stop_requested
+        and (tokens_seen < config.training.max_tokens
         or micro_step % config.training.gradient_accumulation != 0
+        )
     ):
         bucket = schedule.at(micro_step)
         batch = next_encoded_batch(
@@ -256,11 +316,23 @@ def train(config: RunConfig) -> Path:
                 output_dir / "checkpoints",
                 config.training.keep_recent_checkpoints,
                 config.training.keep_every_checkpoints,
+                config.training.keep_milestone_tokens,
             )
             last_checkpoint_tokens = tokens_seen
             next_checkpoint += config.training.checkpoint_every_tokens
+            current_checkpoint = (
+                output_dir / "checkpoints" / f"tokens-{tokens_seen}.pt"
+            )
+            if config.online_evaluation.enabled:
+                del output, loss, batch, masked
+                guard = _run_online_evaluation(config, model, tokenizer, tokens_seen)
+                if guard["passed"]:
+                    last_safe_checkpoint = current_checkpoint
+                else:
+                    stop_requested = True
+                    selected_checkpoint = last_safe_checkpoint
 
-    if last_checkpoint_tokens != tokens_seen:
+    if not stop_requested and last_checkpoint_tokens != tokens_seen:
         save_checkpoint(
             output_dir / "checkpoints" / f"tokens-{tokens_seen}.pt",
             model=model,
@@ -277,7 +349,24 @@ def train(config: RunConfig) -> Path:
             output_dir / "checkpoints",
             config.training.keep_recent_checkpoints,
             config.training.keep_every_checkpoints,
+            config.training.keep_milestone_tokens,
         )
+
+    if config.online_evaluation.enabled:
+        selected_checkpoint = selected_checkpoint or last_safe_checkpoint
+        selection = {
+            "early_stopped": stop_requested,
+            "stopped_at_tokens": tokens_seen,
+            "selected_checkpoint": str(selected_checkpoint),
+        }
+        (output_dir / "online-evaluation" / "selection.json").write_text(
+            json.dumps(selection, indent=2) + "\n",
+            encoding="utf-8",
+        )
+        if selected_checkpoint is None:
+            raise RuntimeError("Online evaluation did not produce a safe checkpoint")
+        selected_state = torch.load(selected_checkpoint, map_location="cpu", weights_only=False)
+        model.load_state_dict(selected_state["model"])
 
     final_dir = output_dir / "final"
     model.save_pretrained(final_dir, safe_serialization=True)

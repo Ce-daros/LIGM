@@ -20,9 +20,16 @@ def build_extension_config(
     config["output_dir"] = str(run_dir)
     config["resume_from"] = str(latest)
     config["training"]["max_tokens"] = current_tokens + add_tokens
-    config["training"]["checkpoint_every_tokens"] = 250_000_000
+    config["training"]["checkpoint_every_tokens"] = 25_000_000
     config["training"]["keep_recent_checkpoints"] = 2
     config["training"]["keep_every_checkpoints"] = 4
+    config["training"]["keep_milestone_tokens"] = [
+        100_000_000,
+        250_000_000,
+        500_000_000,
+        750_000_000,
+        1_000_000_000,
+    ]
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(yaml.safe_dump(config, sort_keys=False), encoding="utf-8")
     return config

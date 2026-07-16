@@ -7,7 +7,7 @@ import torch
 from scipy.stats import spearmanr
 from transformers import AutoModelForMaskedLM, AutoTokenizer
 
-from ligm.config import load_config
+from ligm.config import DataConfig, load_config
 from ligm.data import create_document_source, next_encoded_batch
 from ligm.masking import IGNORE_INDEX, random_word_mask
 from ligm.rotary import use_torch_rotary
@@ -150,24 +150,25 @@ def _repetition_buckets(
 
 
 @torch.no_grad()
-def natural_repetition_recovery(
-    model_path: str,
-    config_path: str,
+def natural_repetition_recovery_model(
+    model,
+    tokenizer,
+    data_config: DataConfig,
     output: Path,
     documents: int = 32,
+    model_name: str | None = None,
 ) -> dict:
-    use_torch_rotary()
-    tokenizer = AutoTokenizer.from_pretrained(model_path, local_files_only=True)
-    model = _load_model(model_path)
-    config = load_config(config_path)
-    data_config = replace(config.data, split="validation")
+    was_training = model.training
+    model.eval()
+    data_config = replace(data_config, split="validation")
     source = create_document_source(data_config, seed=20260716, batch_size=1)
     data_generator = torch.Generator().manual_seed(20260716)
     mask_generator = torch.Generator().manual_seed(20260717)
     totals = {"local": 0, "long": 0}
     correct = {"local": 0, "long": 0}
+    document_results = []
 
-    for _ in range(documents):
+    for document_index in range(documents):
         batch = next_encoded_batch(source, tokenizer, 8000, 1, data_generator)
         original_ids = batch.input_ids[0]
         masked = random_word_mask(
@@ -186,6 +187,8 @@ def natural_repetition_recovery(
         predicted_by_position = dict(
             zip(torch.where(selected)[0].tolist(), predictions.tolist(), strict=True)
         )
+        document_totals = {"local": 0, "long": 0}
+        document_correct = {"local": 0, "long": 0}
         for position, bucket in _repetition_buckets(
             original_ids,
             batch.attention_mask[0],
@@ -193,19 +196,66 @@ def natural_repetition_recovery(
             selected,
         ):
             totals[bucket] += 1
-            correct[bucket] += predicted_by_position[position] == int(original_ids[position])
+            document_totals[bucket] += 1
+            is_correct = predicted_by_position[position] == int(original_ids[position])
+            correct[bucket] += is_correct
+            document_correct[bucket] += is_correct
+        document_results.append(
+            {
+                "document_index": document_index,
+                "buckets": {
+                    bucket: {
+                        "count": document_totals[bucket],
+                        "correct": document_correct[bucket],
+                        "accuracy": (
+                            document_correct[bucket] / document_totals[bucket]
+                            if document_totals[bucket]
+                            else None
+                        ),
+                    }
+                    for bucket in ("local", "long")
+                },
+            }
+        )
 
     report = {
-        "model": model_path,
+        "model": model_name,
         "documents": documents,
         "buckets": {
-            bucket: {"count": totals[bucket], "accuracy": correct[bucket] / totals[bucket]}
+            bucket: {
+                "count": totals[bucket],
+                "correct": correct[bucket],
+                "accuracy": correct[bucket] / totals[bucket] if totals[bucket] else None,
+            }
             for bucket in ("local", "long")
         },
+        "document_results": document_results,
     }
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
+    model.train(was_training)
     return report
+
+
+@torch.no_grad()
+def natural_repetition_recovery(
+    model_path: str,
+    config_path: str,
+    output: Path,
+    documents: int = 32,
+) -> dict:
+    use_torch_rotary()
+    tokenizer = AutoTokenizer.from_pretrained(model_path, local_files_only=True)
+    model = _load_model(model_path)
+    config = load_config(config_path)
+    return natural_repetition_recovery_model(
+        model,
+        tokenizer,
+        config.data,
+        output,
+        documents,
+        model_path,
+    )
 
 
 def main() -> None:

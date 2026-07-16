@@ -4,17 +4,36 @@ import numpy as np
 import torch
 
 
-def prune_checkpoints(path: str | Path, keep_recent: int, keep_every: int) -> None:
+def prune_checkpoints(
+    path: str | Path,
+    keep_recent: int,
+    keep_every: int,
+    milestone_tokens: tuple[int, ...] = (),
+) -> None:
     directory = Path(path)
     checkpoints = sorted(
         directory.glob("tokens-*.pt"),
         key=lambda item: int(item.stem.removeprefix("tokens-")),
     )
-    milestones = {
-        checkpoint
-        for index, checkpoint in enumerate(checkpoints, start=1)
-        if index % keep_every == 0
-    }
+    if milestone_tokens:
+        milestones = {
+            next(
+                (
+                    checkpoint
+                    for checkpoint in checkpoints
+                    if int(checkpoint.stem.removeprefix("tokens-")) >= milestone
+                ),
+                None,
+            )
+            for milestone in milestone_tokens
+        }
+        milestones.discard(None)
+    else:
+        milestones = {
+            checkpoint
+            for index, checkpoint in enumerate(checkpoints, start=1)
+            if index % keep_every == 0
+        }
     retained = milestones | set(checkpoints[-keep_recent:])
     for checkpoint in checkpoints:
         if checkpoint not in retained:

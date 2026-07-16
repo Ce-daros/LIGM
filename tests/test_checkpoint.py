@@ -20,6 +20,25 @@ def test_prune_checkpoints_keeps_recent_and_milestones(tmp_path):
     ]
 
 
+def test_prune_checkpoints_keeps_explicit_token_milestones(tmp_path):
+    for tokens in (100, 126, 251, 276, 501, 526):
+        (tmp_path / f"tokens-{tokens}.pt").touch()
+
+    prune_checkpoints(
+        tmp_path,
+        keep_recent=2,
+        keep_every=100,
+        milestone_tokens=(100, 250, 500),
+    )
+
+    assert sorted(path.name for path in tmp_path.iterdir()) == [
+        "tokens-100.pt",
+        "tokens-251.pt",
+        "tokens-501.pt",
+        "tokens-526.pt",
+    ]
+
+
 def test_save_checkpoint_uses_no_partial_target(tmp_path, monkeypatch):
     target = tmp_path / "tokens-1.pt"
 
