@@ -29,7 +29,7 @@ PY
 cd "$repo"
 export HF_HUB_OFFLINE=1
 "$HOME/.local/bin/uv" run --no-sync ligm-train configs/stage2-online-ligm.yaml
-"$HOME/.local/bin/uv" run --no-sync ligm-online-report \
+"$HOME/.local/bin/uv" run --no-sync python -m ligm.online_report \
   "$root/runs/stage1-ligm-seed11/online-evaluation" \
   "$root/runs/stage1-random-seed11/online-evaluation" \
   --output "$root/runs/stage2-online-curve.json"
