@@ -1,0 +1,21 @@
+{
+  "full_gate": false,
+  "passed": false,
+  "checks": {
+    "distance_information_gain_spearman": {
+      "value": -0.7999999999999999,
+      "threshold": 0.2,
+      "passed": false
+    },
+    "long_recovery_relative_gain": {
+      "value": 0.008619000979431907,
+      "threshold": 0.05,
+      "passed": false
+    },
+    "local_recovery_absolute_change": {
+      "value": -0.0019577800476676677,
+      "threshold": -0.005,
+      "passed": true
+    }
+  }
+}

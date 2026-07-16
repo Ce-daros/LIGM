@@ -21,6 +21,8 @@ def _model_card(run: Path, results: Path, repo_id: str) -> str:
     config = _read(run / "resolved-config.json")
     synthetic = _read(results / "ligm-synthetic.json")
     natural = _read(results / "ligm-natural.json")
+    random_natural_path = results / "random-natural.json"
+    random_natural = _read(random_natural_path) if random_natural_path.exists() else None
     gate = _read(results / "mechanism-gate.json")
     mldr_path = results / "ligm-mldr.json"
     mldr = _read(mldr_path) if mldr_path.exists() else None
@@ -34,6 +36,19 @@ def _model_card(run: Path, results: Path, repo_id: str) -> str:
     mldr_row = (
         f"\n| MLDR-English dev nDCG@10 | {mldr['ndcg_at_10']:.4f} |" if mldr else ""
     )
+    comparison = ""
+    if random_natural:
+        random_local = random_natural["buckets"]["local"]["accuracy"]
+        random_long = random_natural["buckets"]["long"]["accuracy"]
+        ligm_local = natural["buckets"]["local"]["accuracy"]
+        ligm_long = natural["buckets"]["long"]["accuracy"]
+        comparison = f"""
+
+Compared with the token-matched random-MLM baseline, long-distance recovery
+changed from {random_long:.4%} to {ligm_long:.4%} ({(ligm_long - random_long) * 100:+.3f}
+percentage points) and local recovery changed from {random_local:.4%} to
+{ligm_local:.4%} ({(ligm_local - random_local) * 100:+.3f} percentage points).
+"""
     return f"""---
 library_name: transformers
 license: apache-2.0
@@ -110,6 +125,7 @@ random replay spans. An EMA teacher supplies scores and receives no gradients.
 |---|---:|
 | Local (≤128 tokens) | {natural['buckets']['local']['accuracy']:.4f} |
 | Long (≥512 tokens) | {natural['buckets']['long']['accuracy']:.4f} |{mldr_row}
+{comparison}
 
 The complete JSON reports, per-query results when available, resolved training
 configuration, and download manifests are included in `research/`. The source

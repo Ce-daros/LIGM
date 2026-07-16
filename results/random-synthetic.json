@@ -1,0 +1,35 @@
+{
+  "model": "/nvme-data/ligm/runs/stage1-random-seed11/final",
+  "distance_buckets": [
+    {
+      "bucket": "128-512",
+      "accuracy": 0.0,
+      "mean_confidence": 0.0030096255541138817,
+      "mean_information_gain": 0.1507573334965855,
+      "mean_distance": 307.90625
+    },
+    {
+      "bucket": "512-2048",
+      "accuracy": 0.46875,
+      "mean_confidence": 0.04356186902805348,
+      "mean_information_gain": 1.5717024296754971,
+      "mean_distance": 1250.09375
+    },
+    {
+      "bucket": "2048-4096",
+      "accuracy": 0.0625,
+      "mean_confidence": 0.007234570579537802,
+      "mean_information_gain": 0.2961086234434447,
+      "mean_distance": 3034.0625
+    },
+    {
+      "bucket": "4096-8192",
+      "accuracy": 0.0,
+      "mean_confidence": 2.5570970265675896e-06,
+      "mean_information_gain": 3.228945712407949e-05,
+      "mean_distance": 6074.09375
+    }
+  ],
+  "distance_confidence_spearman": -0.39999999999999997,
+  "distance_information_gain_spearman": -0.39999999999999997
+}

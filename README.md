@@ -109,14 +109,26 @@ outside this protocol.
 - [x] Global/all-local short-context equivalence
 - [x] LIGM selection and EMA training smoke test
 - [x] Document-level train/validation/test separation
-- [ ] Stage-one random-MLM baseline
-- [ ] Stage-one LIGM run
-- [ ] Stage-one gate decision
-- [ ] Conditional stage-two training and final checkpoint
-- [ ] Hugging Face model repository and finalized model card
+- [x] Stage-one random-MLM baseline: 100,006,238 tokens
+- [x] Stage-one LIGM run: 100,006,238 tokens
+- [x] Stage-one gate decision: did not pass
+- [x] Stage two stopped by the pre-registered rule
+- [ ] Hugging Face checkpoint and finalized model card
 
-Raw JSONL metrics, resolved configurations, gate reports, and final benchmark
-outputs will be committed after each run completes.
+## Stage-one result
+
+Both runs used the same documents, crop offsets, seed, and effective-token
+schedule. On 32 held-out documents, LIGM raised long-distance repetition
+recovery from 48.624% to 49.043% (`+0.419` percentage points, `+0.862%`
+relative) while local recovery changed from 84.006% to 83.810% (`-0.196`
+percentage points). On the synthetic benchmark, mean accuracy over the four
+distance buckets increased from 13.281% to 26.562%, but the information-gain
+score did not increase monotonically with distance (Spearman rho `-0.8`).
+
+The first-stage gate therefore failed two of three mechanism checks. Conditional
+ablations, retrieval evaluation, and stage-two scaling were not run. This is a
+negative result under the frozen protocol, despite the synthetic accuracy gain.
+Machine-readable reports are committed in [`results/`](results/).
 
 ## License
 

@@ -1,0 +1,35 @@
+{
+  "model": "/nvme-data/ligm/models/ModernBERT-base",
+  "distance_buckets": [
+    {
+      "bucket": "128-512",
+      "accuracy": 0.0,
+      "mean_confidence": 0.005853925016708672,
+      "mean_information_gain": 0.316033944953233,
+      "mean_distance": 307.90625
+    },
+    {
+      "bucket": "512-2048",
+      "accuracy": 0.0,
+      "mean_confidence": 0.05543997423956171,
+      "mean_information_gain": 2.2972736884839833,
+      "mean_distance": 1250.09375
+    },
+    {
+      "bucket": "2048-4096",
+      "accuracy": 0.0,
+      "mean_confidence": 0.010326204212277368,
+      "mean_information_gain": 0.4447127550516188,
+      "mean_distance": 3034.0625
+    },
+    {
+      "bucket": "4096-8192",
+      "accuracy": 0.0,
+      "mean_confidence": 0.0006795140274666878,
+      "mean_information_gain": 0.029251695026445645,
+      "mean_distance": 6074.09375
+    }
+  ],
+  "distance_confidence_spearman": -0.39999999999999997,
+  "distance_information_gain_spearman": -0.39999999999999997
+}

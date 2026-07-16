@@ -1,0 +1,44 @@
+{
+  "runs": [
+    {
+      "run": "/nvme-data/ligm/runs/invalid-stage1-random-step-scheduler",
+      "steps": 264,
+      "tokens_seen": 68421432,
+      "final_loss": 2.1136653423309326,
+      "mean_tokens_per_second": 18305.669201329354,
+      "peak_memory_gib": 7.204634666442871
+    },
+    {
+      "run": "/nvme-data/ligm/runs/smoke-8k-random",
+      "steps": 1,
+      "tokens_seen": 8000,
+      "final_loss": 5.510818958282471,
+      "mean_tokens_per_second": 12987.621043790916,
+      "peak_memory_gib": 5.898065567016602
+    },
+    {
+      "run": "/nvme-data/ligm/runs/smoke-ligm",
+      "steps": 16,
+      "tokens_seen": 32768,
+      "final_loss": 1.1525763273239136,
+      "mean_tokens_per_second": 10358.662550433626,
+      "peak_memory_gib": 2.980410099029541
+    },
+    {
+      "run": "/nvme-data/ligm/runs/stage1-ligm-seed11",
+      "steps": 392,
+      "tokens_seen": 100006238,
+      "final_loss": 1.1661899089813232,
+      "mean_tokens_per_second": 8935.638476545777,
+      "peak_memory_gib": 7.512559413909912
+    },
+    {
+      "run": "/nvme-data/ligm/runs/stage1-random-seed11",
+      "steps": 392,
+      "tokens_seen": 100006238,
+      "final_loss": 1.3536105155944824,
+      "mean_tokens_per_second": 18234.427703717032,
+      "peak_memory_gib": 7.204634666442871
+    }
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "model": "/nvme-data/ligm/models/ModernBERT-base",
+  "documents": 32,
+  "buckets": {
+    "local": {
+      "count": 35244,
+      "accuracy": 0.8308080808080808
+    },
+    "long": {
+      "count": 10499,
+      "accuracy": 0.4769978093151729
+    }
+  }
+}

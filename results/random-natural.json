@@ -1,0 +1,14 @@
+{
+  "model": "/nvme-data/ligm/runs/stage1-random-seed11/final",
+  "documents": 32,
+  "buckets": {
+    "local": {
+      "count": 35244,
+      "accuracy": 0.8400578821927136
+    },
+    "long": {
+      "count": 10499,
+      "accuracy": 0.48623678445566243
+    }
+  }
+}
