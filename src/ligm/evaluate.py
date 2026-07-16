@@ -16,7 +16,7 @@ from ligm.scoring import information_gain_statistics
 DISTANCE_BUCKETS = ((128, 512), (512, 2048), (2048, 4096), (4096, 8192))
 
 
-def _load_model(model_path: str):
+def _load_model(model_path: str, checkpoint: str | None = None):
     model = (
         AutoModelForMaskedLM.from_pretrained(
             model_path,
@@ -27,6 +27,9 @@ def _load_model(model_path: str):
         .to("cuda")
         .eval()
     )
+    if checkpoint:
+        state = torch.load(checkpoint, map_location="cpu", weights_only=False)
+        model.load_state_dict(state["model"])
     model.config.reference_compile = False
     return model
 
@@ -45,11 +48,16 @@ def _single_token_markers(tokenizer, count: int) -> list[tuple[str, int]]:
 
 
 @torch.no_grad()
-def synthetic_long_range(model_path: str, output: Path, samples_per_bucket: int = 32) -> dict:
+def synthetic_long_range(
+    model_path: str,
+    output: Path,
+    samples_per_bucket: int = 32,
+    checkpoint: str | None = None,
+) -> dict:
     device = torch.device("cuda")
     use_torch_rotary()
     tokenizer = AutoTokenizer.from_pretrained(model_path, local_files_only=True)
-    model = _load_model(model_path)
+    model = _load_model(model_path, checkpoint)
     markers = _single_token_markers(tokenizer, 4)
     filler_ids = tokenizer(
         "The intervening document contains unrelated explanatory material. ",
@@ -114,6 +122,7 @@ def synthetic_long_range(model_path: str, output: Path, samples_per_bucket: int 
     ).statistic
     report = {
         "model": model_path,
+        "checkpoint": checkpoint,
         "distance_buckets": results,
         "distance_confidence_spearman": confidence_correlation,
         "distance_information_gain_spearman": score_correlation,
@@ -251,10 +260,11 @@ def natural_repetition_recovery(
     config_path: str,
     output: Path,
     documents: int = 32,
+    checkpoint: str | None = None,
 ) -> dict:
     use_torch_rotary()
     tokenizer = AutoTokenizer.from_pretrained(model_path, local_files_only=True)
-    model = _load_model(model_path)
+    model = _load_model(model_path, checkpoint)
     config = load_config(config_path)
     return natural_repetition_recovery_model(
         model,
@@ -262,7 +272,7 @@ def natural_repetition_recovery(
         config.data,
         output,
         documents,
-        model_path,
+        checkpoint or model_path,
     )
 
 
@@ -273,6 +283,7 @@ def main() -> None:
     parser.add_argument("--samples-per-bucket", type=int, default=32)
     parser.add_argument("--natural-config")
     parser.add_argument("--documents", type=int, default=32)
+    parser.add_argument("--checkpoint")
     args = parser.parse_args()
     if args.natural_config:
         natural_repetition_recovery(
@@ -280,9 +291,15 @@ def main() -> None:
             args.natural_config,
             args.output,
             args.documents,
+            args.checkpoint,
         )
     else:
-        synthetic_long_range(args.model_path, args.output, args.samples_per_bucket)
+        synthetic_long_range(
+            args.model_path,
+            args.output,
+            args.samples_per_bucket,
+            args.checkpoint,
+        )
 
 
 if __name__ == "__main__":

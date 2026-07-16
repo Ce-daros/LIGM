@@ -28,4 +28,5 @@ PY
 
 cd "$repo"
 export HF_HUB_OFFLINE=1
-exec "$HOME/.local/bin/uv" run --no-sync ligm-train configs/stage2-online-ligm.yaml
+"$HOME/.local/bin/uv" run --no-sync ligm-train configs/stage2-online-ligm.yaml
+bash scripts/evaluate_stage2_milestones.sh
