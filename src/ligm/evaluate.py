@@ -7,7 +7,7 @@ import torch
 from scipy.stats import spearmanr
 from transformers import AutoModelForMaskedLM, AutoTokenizer
 
-from ligm.config import DataConfig, load_config
+from ligm.config import DataConfig, DataStreamConfig, load_config
 from ligm.data import create_document_source, next_encoded_batch
 from ligm.masking import IGNORE_INDEX, random_word_mask
 from ligm.rotary import use_torch_rotary
@@ -160,7 +160,15 @@ def natural_repetition_recovery_model(
 ) -> dict:
     was_training = model.training
     model.eval()
-    data_config = replace(data_config, split="validation")
+    evaluation_streams = tuple(
+        DataStreamConfig(remote=None, local=stream.remote, proportion=stream.proportion)
+        for stream in data_config.streams
+    )
+    data_config = replace(
+        data_config,
+        split="validation",
+        streams=evaluation_streams or data_config.streams,
+    )
     source = create_document_source(data_config, seed=20260716, batch_size=1)
     data_generator = torch.Generator().manual_seed(20260716)
     mask_generator = torch.Generator().manual_seed(20260717)

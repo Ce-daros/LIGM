@@ -13,7 +13,7 @@ class SequenceBucket:
 
 @dataclass(frozen=True)
 class DataStreamConfig:
-    remote: str
+    remote: str | None
     local: str
     proportion: float
 
