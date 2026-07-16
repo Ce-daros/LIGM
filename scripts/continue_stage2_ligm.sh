@@ -34,3 +34,6 @@ export HF_HUB_OFFLINE=1
   "$root/runs/stage1-random-seed11/online-evaluation" \
   --output "$root/runs/stage2-online-curve.json"
 bash scripts/evaluate_stage2_milestones.sh
+"$HOME/.local/bin/uv" run --no-sync python -m ligm.decision \
+  "$root/runs/stage2-online-curve.json" \
+  --output "$root/runs/stage2-decision.json"

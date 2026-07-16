@@ -39,6 +39,7 @@ gpu = [
 
 [project.scripts]
 ligm-download = "ligm.download:main"
+ligm-decision = "ligm.decision:main"
 ligm-extend = "ligm.extend:main"
 ligm-bootstrap = "ligm.bootstrap:main"
 ligm-snapshot = "ligm.snapshot:main"
