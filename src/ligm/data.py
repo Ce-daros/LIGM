@@ -73,7 +73,12 @@ class MDSDocumentSource:
 
     def __next__(self) -> Mapping:
         while True:
-            sample = next(self.iterator)
+            try:
+                sample = next(self.iterator)
+            except StopIteration:
+                self.iterator = iter(self.dataset)
+                self.samples_consumed = 0
+                sample = next(self.iterator)
             self.samples_consumed += 1
             if document_split(sample["id"]) == self.split:
                 self.samples_seen += 1
@@ -88,7 +93,7 @@ class MDSDocumentSource:
 
     def load_state_dict(self, state: dict) -> None:
         self.samples_seen = int(state["samples_seen"])
-        self.samples_consumed = int(state["samples_consumed"])
+        self.samples_consumed = 0
         self.dataset.load_state_dict(state["dataset"])
         self.iterator = iter(self.dataset)
 
