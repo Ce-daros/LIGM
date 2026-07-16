@@ -16,7 +16,12 @@ def _read(path: Path) -> dict:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
-def _model_card(run: Path, results: Path, repo_id: str) -> str:
+def _model_card(
+    run: Path,
+    results: Path,
+    repo_id: str,
+    online_curve: Path | None = None,
+) -> str:
     metrics = [json.loads(line) for line in (run / "metrics.jsonl").read_text().splitlines()]
     config = _read(run / "resolved-config.json")
     synthetic = _read(results / "ligm-synthetic.json")
@@ -48,6 +53,38 @@ Compared with the token-matched random-MLM baseline, long-distance recovery
 changed from {random_long:.4%} to {ligm_long:.4%} ({(ligm_long - random_long) * 100:+.3f}
 percentage points) and local recovery changed from {random_local:.4%} to
 {ligm_local:.4%} ({(ligm_local - random_local) * 100:+.3f} percentage points).
+"""
+    online_section = ""
+    selected_tokens = metrics[-1]["tokens_seen"]
+    selection_path = run / "online-evaluation" / "selection.json"
+    if selection_path.exists():
+        selection = _read(selection_path)
+        selected_checkpoint = selection["selected_checkpoint"]
+        selected_tokens = int(Path(selected_checkpoint).stem.removeprefix("tokens-"))
+    if online_curve and online_curve.exists():
+        curve = _read(online_curve)
+        online_rows = "\n".join(
+            f"| {point['tokens_seen']:,} | "
+            f"{point['local']['absolute_difference'] * 100:+.3f} "
+            f"[{point['local']['confidence_interval_95'][0] * 100:+.3f}, "
+            f"{point['local']['confidence_interval_95'][1] * 100:+.3f}] | "
+            f"{point['long']['absolute_difference'] * 100:+.3f} "
+            f"[{point['long']['confidence_interval_95'][0] * 100:+.3f}, "
+            f"{point['long']['confidence_interval_95'][1] * 100:+.3f}] |"
+            for point in curve["points"]
+        )
+        online_section = f"""
+
+### Exploratory online extension
+
+After the failed first-stage gate, an exploratory extension used a fixed set of
+128 held-out documents and a hard local-recovery guard. Training stopped if
+LIGM fell more than 0.5 percentage points below token-matched random MLM. The
+intervals below are paired document-bootstrap 95% intervals with 10,000 samples.
+
+| Tokens | Local difference, pp [95% CI] | Long difference, pp [95% CI] |
+|---:|---:|---:|
+{online_rows}
 """
     return f"""---
 library_name: transformers
@@ -102,7 +139,7 @@ encoder for retrieval or classification before using it for those tasks.
 
 - Base revision: `8949b909ec900327062f0ebf497f51aef5e6f0c8`
 - Ettin extension-data revision: `996ec10f55ee16739389f4afc0993bbc28716fe5`
-- Tokens processed by this run: `{metrics[-1]['tokens_seen']:,}`
+- Selected checkpoint tokens: `{selected_tokens:,}`
 - Precision: BF16
 - Optimizer: StableAdamW
 - Peak allocated GPU memory: `{max(item['peak_memory_gib'] for item in metrics):.2f}` GiB
@@ -126,6 +163,7 @@ random replay spans. An EMA teacher supplies scores and receives no gradients.
 | Local (≤128 tokens) | {natural['buckets']['local']['accuracy']:.4f} |
 | Long (≥512 tokens) | {natural['buckets']['long']['accuracy']:.4f} |{mldr_row}
 {comparison}
+{online_section}
 
 The complete JSON reports, per-query results when available, resolved training
 configuration, and download manifests are included in `research/`. The source
@@ -159,6 +197,8 @@ def build_release(
     license_path: Path,
     output: Path,
     repo_id: str,
+    online_curve: Path | None = None,
+    online_evaluation: Path | None = None,
 ) -> None:
     output.mkdir(parents=True)
     for filename in MODEL_FILES:
@@ -174,8 +214,12 @@ def build_release(
     for path in sorted(manifests.iterdir()):
         if path.is_file():
             shutil.copy2(path, research / path.name)
+    if online_curve and online_curve.exists():
+        shutil.copy2(online_curve, research / online_curve.name)
+    if online_evaluation and online_evaluation.exists():
+        shutil.copytree(online_evaluation, research / "online-evaluation")
     (output / "README.md").write_text(
-        _model_card(run, results, repo_id),
+        _model_card(run, results, repo_id, online_curve),
         encoding="utf-8",
     )
 
@@ -189,6 +233,8 @@ def main() -> None:
     parser.add_argument("--license", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--repo-id", required=True)
+    parser.add_argument("--online-curve", type=Path)
+    parser.add_argument("--online-evaluation", type=Path)
     args = parser.parse_args()
     build_release(
         args.model,
@@ -198,6 +244,8 @@ def main() -> None:
         args.license,
         args.output,
         args.repo_id,
+        args.online_curve,
+        args.online_evaluation,
     )
 
 
