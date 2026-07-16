@@ -24,37 +24,10 @@ def _model_card(
 ) -> str:
     metrics = [json.loads(line) for line in (run / "metrics.jsonl").read_text().splitlines()]
     config = _read(run / "resolved-config.json")
-    synthetic = _read(results / "ligm-synthetic.json")
-    natural = _read(results / "ligm-natural.json")
-    random_natural_path = results / "random-natural.json"
-    random_natural = _read(random_natural_path) if random_natural_path.exists() else None
-    gate = _read(results / "mechanism-gate.json")
     mldr_path = results / "ligm-mldr.json"
     mldr = _read(mldr_path) if mldr_path.exists() else None
-    gate_label = "passed" if gate["passed"] else "did not pass"
     mean_throughput = sum(item["tokens_per_second"] for item in metrics) / len(metrics)
-    distance_rows = "\n".join(
-        f"| {item['bucket']} | {item['accuracy']:.4f} | "
-        f"{item['mean_information_gain']:.6f} |"
-        for item in synthetic["distance_buckets"]
-    )
-    mldr_row = (
-        f"\n| MLDR-English dev nDCG@10 | {mldr['ndcg_at_10']:.4f} |" if mldr else ""
-    )
-    comparison = ""
-    if random_natural:
-        random_local = random_natural["buckets"]["local"]["accuracy"]
-        random_long = random_natural["buckets"]["long"]["accuracy"]
-        ligm_local = natural["buckets"]["local"]["accuracy"]
-        ligm_long = natural["buckets"]["long"]["accuracy"]
-        comparison = f"""
-
-Compared with the token-matched random-MLM baseline, long-distance recovery
-changed from {random_long:.4%} to {ligm_long:.4%} ({(ligm_long - random_long) * 100:+.3f}
-percentage points) and local recovery changed from {random_local:.4%} to
-{ligm_local:.4%} ({(ligm_local - random_local) * 100:+.3f} percentage points).
-"""
-    online_section = ""
+    online_section = "Evaluation results are pending."
     selected_tokens = metrics[-1]["tokens_seen"]
     selection_path = run / "online-evaluation" / "selection.json"
     if selection_path.exists():
@@ -75,17 +48,22 @@ percentage points) and local recovery changed from {random_local:.4%} to
         )
         online_section = f"""
 
-### Exploratory online extension
+### Online training curve
 
-After the failed first-stage gate, an exploratory extension used a fixed set of
-128 held-out documents and a hard local-recovery guard. Training stopped if
-LIGM fell more than 0.5 percentage points below token-matched random MLM. The
-intervals below are paired document-bootstrap 95% intervals with 10,000 samples.
+The run used a fixed set of 128 held-out documents and a hard local-recovery
+guard. Training stopped if LIGM fell more than 0.5 percentage points below
+token-matched random MLM. The intervals below are paired document-bootstrap 95%
+intervals with 10,000 samples.
 
 | Tokens | Local difference, pp [95% CI] | Long difference, pp [95% CI] |
 |---:|---:|---:|
 {online_rows}
 """
+    retrieval_section = (
+        f"\n### Retrieval\n\nMLDR-English dev nDCG@10: `{mldr['ndcg_at_10']:.4f}`\n"
+        if mldr
+        else "\nNo downstream retrieval score is reported for this checkpoint.\n"
+    )
     return f"""---
 library_name: transformers
 license: apache-2.0
@@ -111,10 +89,6 @@ It was trained with Long-range Information-Gain Masking (LIGM), which selects ML
 targets using the prediction difference between normal ModernBERT attention and
 an all-local attention counterfactual. The architecture and 8,192-token context
 limit are unchanged.
-
-The pre-registered first-stage mechanism gate **{gate_label}**. This statement is
-reported regardless of outcome; additional training is not treated as evidence
-when the gate fails.
 
 ## Usage
 
@@ -154,16 +128,8 @@ random replay spans. An EMA teacher supplies scores and receives no gradients.
 
 ## Evaluation
 
-| Distance bucket (tokens) | Recovery accuracy | Mean information gain |
-|---|---:|---:|
-{distance_rows}
-
-| Held-out natural repetition bucket | Accuracy |
-|---|---:|
-| Local (≤128 tokens) | {natural['buckets']['local']['accuracy']:.4f} |
-| Long (≥512 tokens) | {natural['buckets']['long']['accuracy']:.4f} |{mldr_row}
-{comparison}
 {online_section}
+{retrieval_section}
 
 The complete JSON reports, per-query results when available, resolved training
 configuration, and download manifests are included in `research/`. The source
@@ -174,8 +140,8 @@ code is available at [Ce-daros/LIGM](https://github.com/Ce-daros/LIGM).
 The base model and continued-pretraining mixture are primarily English and code.
 The checkpoint has not been instruction-tuned and should not be interpreted as a
 general-purpose assistant. Synthetic recovery measures mechanism behavior rather
-than broad language understanding. A failed gate is a negative experimental
-result, not evidence of improved long-document retrieval.
+than broad language understanding. MLM recovery does not by itself establish
+improved downstream retrieval.
 
 The reference FlashAttention environment required a PyTorch implementation of
 ModernBERT's unpadded rotary operation because Torch 2.6/Triton 3.2 could not

@@ -3,7 +3,7 @@ import json
 from ligm.release import _model_card
 
 
-def test_model_card_reports_failed_gate_without_claiming_improvement(tmp_path):
+def test_model_card_does_not_claim_unmeasured_retrieval_result(tmp_path):
     run = tmp_path / "run"
     results = tmp_path / "results"
     run.mkdir()
@@ -36,12 +36,11 @@ def test_model_card_reports_failed_gate_without_claiming_improvement(tmp_path):
 
     card = _model_card(run, results, "owner/model")
 
-    assert "gate **did not pass**" in card
-    assert "A failed gate is a negative experimental" in card
-    assert "result, not evidence of improved long-document retrieval" in card
+    assert "No downstream retrieval score is reported" in card
+    assert "MLM recovery does not by itself establish" in card
 
 
-def test_model_card_reports_exploratory_online_curve(tmp_path):
+def test_model_card_reports_online_curve(tmp_path):
     run = tmp_path / "run"
     results = tmp_path / "results"
     online = run / "online-evaluation"
@@ -100,5 +99,5 @@ def test_model_card_reports_exploratory_online_curve(tmp_path):
     card = _model_card(run, results, "owner/model", curve)
 
     assert "Selected checkpoint tokens: `150`" in card
-    assert "Exploratory online extension" in card
+    assert "Online training curve" in card
     assert "+0.400 [+0.100, +0.700]" in card

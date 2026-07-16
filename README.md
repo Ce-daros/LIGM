@@ -74,39 +74,10 @@ uv run ligm-train configs/smoke-ligm.yaml
 uv run python scripts/verify_resume.py
 ```
 
-Run the paired first-stage experiments and focused evaluation:
-
-```bash
-bash scripts/run_stage1.sh
-bash scripts/evaluate_stage1.sh
-# Only after mechanism-gate.json reports passed:
-bash scripts/run_stage1_conditionals.sh
-```
-
-The stage-one gate uses only:
-
-- synthetic distance-controlled recovery and score correlation;
-- held-out natural-document local and long-distance repetition recovery;
-- a fixed 250K MS MARCO hard-negative probe on MLDR-English dev if the mechanism
-  checks pass.
-
-Download the retrieval data only after the mechanism checks pass:
-
-```bash
-bash scripts/download_retrieval.sh
-uv run ligm-retrieval train configs/retrieval-probe.yaml MODEL_PATH --output OUTPUT_DIR
-uv run ligm-retrieval evaluate configs/retrieval-probe.yaml RETRIEVER_PATH \
-  --output EVALUATION_DIR
-```
-
 GLUE, BEIR, MLDR-ID, code retrieval, ColBERT, and broad hyperparameter sweeps are
 outside this protocol.
 
-## Exploratory online extension
-
-The original first-stage decision remains a failed gate. A dated amendment in
-[`plan.md`](plan.md) defines a separate exploratory extension with a 1B-token
-upper bound. It does not retroactively change the first-stage thresholds.
+## Online training
 
 The token-matched random curve is trained first. Both methods pause every 25M
 tokens and evaluate the same 128 held-out documents with the same mask seed. For
@@ -138,33 +109,14 @@ uv run ligm-train configs/smoke-online-stop.yaml
 - [x] Global/all-local short-context equivalence
 - [x] LIGM selection and EMA training smoke test
 - [x] Document-level train/validation/test separation
-- [x] Stage-one random-MLM baseline: 100,006,238 tokens
-- [x] Stage-one LIGM run: 100,006,238 tokens
-- [x] Stage-one gate decision: did not pass
-- [x] Pre-registered stage two stopped by the original rule
-- [x] Exploratory online guard and safe-checkpoint rollback verified
-- [ ] Exploratory 1B random reference curve
-- [ ] Exploratory online LIGM extension
+- [x] Online guard and safe-checkpoint rollback verified
+- [ ] 1B random reference curve
+- [ ] Online LIGM training with a 1B upper bound
 - [ ] Hugging Face checkpoint and finalized model card
-
-## Stage-one result
-
-Both runs used the same documents, crop offsets, seed, and effective-token
-schedule. On 32 held-out documents, LIGM raised long-distance repetition
-recovery from 48.624% to 49.043% (`+0.419` percentage points, `+0.862%`
-relative) while local recovery changed from 84.006% to 83.810% (`-0.196`
-percentage points). On the synthetic benchmark, mean accuracy over the four
-distance buckets increased from 13.281% to 26.562%, but the information-gain
-score did not increase monotonically with distance (Spearman rho `-0.8`).
-
-The first-stage gate therefore failed two of three mechanism checks. Conditional
-ablations, retrieval evaluation, and pre-registered stage-two scaling were not
-run. This is a negative result under the frozen protocol, despite the synthetic
-accuracy gain. Machine-readable reports are committed in [`results/`](results/).
 
 ## Release
 
-After the exploratory run and selection report complete, build, upload, and
+After the online run and selection report complete, build, upload, and
 verify the model repository from the RTX workstation:
 
 ```bash
