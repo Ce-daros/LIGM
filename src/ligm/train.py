@@ -19,9 +19,9 @@ from ligm.masking import (
     random_word_mask,
     select_ligm_targets,
 )
+from ligm.online import compare_local_recovery, read_report
 from ligm.rotary import use_torch_rotary
 from ligm.scoring import entropy_scores, information_gain_scores
-from ligm.online import compare_local_recovery, read_report
 
 
 def set_seed(seed: int) -> dict[str, torch.Generator]:
