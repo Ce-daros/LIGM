@@ -134,7 +134,7 @@ Hugging Face Hub 自身也支持自定义 endpoint、local cache 和并发下载
 
 2. 固定自然文档 MLM：
    - 0–128 token 局部恢复
-   - 128 token 以上长程恢复
+   - 512 token 以上长程恢复
 
 3. 廉价 MLDR probe：
    - 原始 ModernBERT、随机 MLM、完整 LIGM。
@@ -157,31 +157,79 @@ Hugging Face Hub 自身也支持自定义 endpoint、local cache 和并发下载
 
 任一核心门槛失败即停止扩大训练，记录负结果，不通过增加 token 数碰运气。
 
+### 第一阶段结果与前瞻性修订
+
+第一阶段于 2026-07-16 完成。随机 MLM 与完整 LIGM 均使用种子 `11` 训练
+`100,006,238` token。LIGM 的固定自然文档长程恢复相对随机 MLM 从
+`48.624%` 提高到 `49.043%`，绝对提高 `0.419` 点、相对提高 `0.862%`；
+局部恢复从 `84.006%` 变为 `83.810%`，绝对下降 `0.196` 点。合成四桶平均
+恢复准确率从 `13.281%` 提高到 `26.562%`，但 LIGM score 与距离的
+Spearman 相关系数为 `-0.8`。
+
+因此，原第一阶段门槛失败，Entropy、仅使用 \(g_i\) 和 MLDR probe 均未运行。
+该结论保持不变。以下第二阶段是看到第一阶段结果后制定的探索性追加实验，不能
+用于声称原门槛已经通过，也不能覆盖第一阶段的负结果。
+
 ## 第二阶段：放开训练
 
-### 正式训练
+### 在线评测与硬停止
 
-仅正式扩展：
+第二阶段将评测嵌入训练控制流程，而不是等训练结束后再决定：
 
-- 完整 LIGM：种子 `11/22/33`。
-- 随机 30% MLM token-matched：种子 `11/22/33`。
-- 随机 MLM compute-matched：只运行种子 `11`，训练到与 LIGM 相同 GPU 小时。
-- Entropy masking：仅当第一阶段 MLDR probe 距 LIGM不超过 0.5 nDCG 时运行一个正式种子。
+1. 先将种子 `11` 的随机 30% MLM 从现有 100M checkpoint 续训至最高 1B
+   token，建立 token-matched 参考曲线；续训前先在现有随机与 LIGM 100M
+   checkpoint 上用新的 128 篇固定验证集建立共同起点。
+2. 每 25M token 暂停一次训练，保存 checkpoint，并在固定的 128 篇验证文档
+   上运行自然重复恢复评测。
+3. 保存逐文档、局部桶和长程桶的原始计数与准确率；同一评测集、mask seed 和
+   数据顺序在所有方法及所有检查点之间保持不变。
+4. 随后续训种子 `11` 的 LIGM。每个检查点与相同 token 数的随机 MLM 结果
+   配对，定义：
 
-训练以 500M token 为一个 block，不预设总 token 上限：
+   \[
+   \Delta_{local}(t)=Acc^{LIGM}_{local}(t)-Acc^{Random}_{local}(t)
+   \]
 
-- 每 500M token 运行合成与自然 MLM 机制评测。
-- 每 1B token 仅对种子 11 运行一次 250K MS MARCO → MLDR dev probe。
-- 种子 11 决定停止预算，其他种子随后训练到完全相同的 token 数。
-- Checkpoint 每 250M token 保存一次，只保留最近两个、每个 1B 边界和最终候选。
+5. 若任一在线评测满足 \(\Delta_{local}(t)<-0.005\)，立即正常终止当前 LIGM
+   run，不继续到下一个 token 区间，并选择上一个满足门槛的 checkpoint 作为
+   安全候选。该判断不要求连续两次越界。
+6. 自然长程恢复随每个 25M checkpoint 记录；合成四桶准确率与
+   information-gain 统计只在 `100M / 250M / 500M / 750M / 1B` 里程碑运行。
+   这些指标均不覆盖 `-0.5` 点局部恢复硬停止规则。
 
-满足以下任一条件即停止继续扩展：
+在线评测通过单卡顺序执行：训练到评测点后释放训练临时张量，在同一张 RTX 3090
+上完成评测，再恢复训练。不得同时运行训练和评测进程争用显存。
 
-- 连续两个 1B-token probe 的 MLDR dev 提升均小于 `0.2`，且长程 MLM 提升均小于 1%。
-- 0–128 token 恢复相对随机 MLM下降超过 `0.5` 点。
-- LIGM 与随机 MLM 的差距连续两个 probe 缩小。
+### Checkpoint 与预算
 
-最终 checkpoint 按 MLDR dev 选择；MLDR test 在模型和统计方案冻结后只运行一次。
+- Checkpoint 和自然在线评测间隔均为 25M token，约对应当前配置下的
+  980–1000 个 optimizer step；以 token 数而不是 step 数作为唯一触发条件。
+- 最高训练预算固定为 1B token，不在第二阶段内继续提高上限。
+- 永久保留 `100M / 250M / 500M / 750M / 1B` checkpoint，并始终保留最近
+  两个 25M checkpoint，确保触发硬停止后可以回到上一个安全点。
+- 每次评测的 JSON 和逐文档记录永久保留，不随 checkpoint 清理。
+- 250M 和 500M 是趋势检查点；只有此前未触发局部硬停止才继续。1B 是最终上限，
+  不是必须消耗完的目标。
+
+### 对照与种子晋级
+
+- 种子 `11` 先运行完整的 token-matched 随机曲线，再运行带在线硬停止的 LIGM。
+- 随机 MLM compute-matched 只运行种子 `11`，其 GPU 时间与最终入选 LIGM
+  checkpoint 相同。
+- 种子 `22/33` 先各运行 100M 的随机 MLM 与 LIGM，确认长程差值方向是否一致。
+- 只有种子 `11` 在 500M 仍保持长程优势且未触发局部硬停止，种子 `22/33`
+  才晋级到相同 token 预算；所有晋级 run 使用同一在线硬停止规则。
+- Entropy masking 和仅使用 \(g_i\) 的消融不因扩大 token 预算自动解锁；只有主实验
+  在 500M 仍保持长程优势后，各运行一个种子和相同 token 预算。
+
+### 检索评测解锁
+
+- 250M 只运行机制评测，不运行检索任务。
+- 种子 `11` 在 500M 仍保持自然长程恢复优势且未触发局部硬停止时，解锁一次固定
+  250K MS MARCO → MLDR-English dev probe。
+- 若继续至 1B，在 1B 再运行一次相同 probe。
+- 最终 checkpoint 只能从通过局部硬停止门槛的候选中按 MLDR dev 选择；MLDR
+  test 在模型、统计方案和 checkpoint 全部冻结后只运行一次。
 
 ### 最终下游评测
 
