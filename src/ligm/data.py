@@ -86,6 +86,7 @@ class MDSDocumentSource:
 
     def state_dict(self) -> dict:
         return {
+            "format_version": 2,
             "samples_seen": self.samples_seen,
             "samples_consumed": self.samples_consumed,
             "dataset": self.dataset.state_dict(self.samples_consumed, False),
