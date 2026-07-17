@@ -1,6 +1,6 @@
 import pytest
 
-from scripts.migrate_legacy_mds_checkpoint import migrate_source_state
+from ligm.migrate import migrate_source_state
 
 
 def test_migrate_legacy_source_removes_duplicated_resume_offset() -> None:
