@@ -207,6 +207,7 @@ def train(config: RunConfig) -> Path:
     ).to(device)
     model.config.reference_compile = False
     model.config.sparse_prediction = True
+    model.config.repad_logits_with_grad = config.training.method == "ligm_weighted"
     model.gradient_checkpointing_enable()
     model.train()
 
