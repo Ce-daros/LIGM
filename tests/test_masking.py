@@ -1,6 +1,11 @@
 import torch
 
-from ligm.masking import candidate_word_mask, random_word_mask, select_ligm_targets
+from ligm.masking import (
+    candidate_word_mask,
+    random_word_mask,
+    select_ligm_targets,
+    weight_ligm_targets,
+)
 
 
 def _batch() -> tuple[torch.Tensor, torch.Tensor]:
@@ -63,3 +68,19 @@ def test_ligm_uses_exact_candidate_target_and_replay_ratios_for_single_token_wor
     assert candidates.candidates.sum() == 40
     assert selected.selected.sum() == 30
     assert selected.selected[0, highest_scoring].all()
+
+
+def test_weighted_ligm_preserves_random_mask_and_upweights_high_scores():
+    input_ids = torch.arange(102).reshape(1, 102)
+    word_ids = torch.tensor([[-1, *range(100), -1]])
+    generator = torch.Generator().manual_seed(11)
+    masked = random_word_mask(input_ids, word_ids, 999, 1000, generator)
+    scores = torch.arange(102, dtype=torch.float32).reshape(1, 102)
+
+    weighted = weight_ligm_targets(masked, word_ids, scores)
+
+    masked_positions = torch.where(masked.selected[0])[0]
+    highest_scoring = masked_positions[torch.argsort(scores[0, masked_positions])[-20:]]
+    assert torch.equal(weighted.selected, masked.selected)
+    assert weighted.loss_weights[0, highest_scoring].eq(4.0).all()
+    assert weighted.loss_weights[~weighted.selected].eq(0.0).all()

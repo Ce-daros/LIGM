@@ -249,6 +249,27 @@ Spearman 相关系数为 `-0.8`。
 - 0–128 token 自然 MLM 不下降超过 `0.5` 点。
 - 单独报告 compute-matched 随机 MLM；若 LIGM 只超过 token-matched 对照，论文结论限定为 token efficiency。
 
+### LIGM v2：`+1.0` 长程恢复筛选
+
+完整 1B 配对曲线结束后，不从主 LIGM checkpoint 继续堆 token。以随机 MLM 的
+1B checkpoint 作为新的共同起点，先运行一次 25M token、仅含 8K 序列的短筛选：
+
+1. `random-long`：30% whole-word random MLM，作为相同数据、序列长度和 token
+   预算的基线。
+2. `weighted4`：先采样与训练输入完全一致的 30% 掩码，在这份输入上计算
+   global-vs-all-local information gain；最高分的 20% token 使用 4 倍损失权重。
+3. `weighted8`：与 `weighted4` 相同，但定向 token 使用 8 倍损失权重，用于判断
+   当前方法是否主要受长程梯度稀释限制。
+
+三个分支重置优化器并使用独立的 25M warmup-stable-decay 调度，数据位置、随机数
+状态和初始模型完全一致。每个分支结束后在固定 128 篇文档上配对评测，并继续执行
+局部恢复不低于 `-0.5` 点的硬门槛。
+
+短筛选的晋级规则为：长程恢复相对 `random-long` 至少 `+0.6` 点，且逐文档配对
+bootstrap 的 95% 区间下界高于 0。只有满足该规则的权重才扩展到 100M；100M
+目标为长程恢复 `+1.0` 点。若两个权重均未达到 `+0.6`，不扩大 token 预算，转而
+判定现有 token 选择目标不足以产生 1 点收益。
+
 ## 验证与交付
 
 实现前必须通过：

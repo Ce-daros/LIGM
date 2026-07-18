@@ -50,6 +50,11 @@ class TrainingConfig:
     learning_rate: float = 2e-5
     weight_decay: float = 0.01
     ema_decay: float = 0.999
+    mask_ratio: float = 0.30
+    target_ratio: float = 0.20
+    target_loss_weight: float = 4.0
+    scheduler_origin_tokens: int = 0
+    restart_optimizer: bool = False
     warmup_ratio: float = 0.02
     stable_ratio: float = 0.83
     checkpoint_every_tokens: int = 25_000_000
@@ -102,7 +107,13 @@ def load_config(path: str | Path) -> RunConfig:
         **({"milestone_tokens": online_milestones} if online_milestones else {}),
     )
     config = RunConfig(data=data, training=training, online_evaluation=online, **raw)
-    if training.method not in {"ligm", "ligm_gain", "entropy", "random"}:
+    if training.method not in {
+        "ligm",
+        "ligm_gain",
+        "ligm_weighted",
+        "entropy",
+        "random",
+    }:
         raise ValueError(f"Unsupported method: {training.method}")
     if data.split not in {"train", "validation", "test"}:
         raise ValueError(f"Unsupported data split: {data.split}")
@@ -110,6 +121,12 @@ def load_config(path: str | Path) -> RunConfig:
         raise ValueError("Warmup and stable ratios must sum to 0.85")
     if online.enabled and online.documents <= 0:
         raise ValueError("Online evaluation requires at least one document")
+    if not 0.0 < training.mask_ratio < 1.0:
+        raise ValueError("Mask ratio must be between zero and one")
+    if not 0.0 < training.target_ratio <= training.mask_ratio:
+        raise ValueError("Target ratio must be positive and no greater than mask ratio")
+    if training.target_loss_weight < 1.0:
+        raise ValueError("Target loss weight must be at least one")
     if online.reference_dir and training.method == "random":
         raise ValueError("Random reference runs cannot use an online reference directory")
     return config

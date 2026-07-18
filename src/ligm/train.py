@@ -5,6 +5,7 @@ from pathlib import Path
 
 import numpy as np
 import torch
+import torch.nn.functional as F
 from optimi import StableAdamW
 from torch.optim.lr_scheduler import LambdaLR
 from transformers import AutoModelForMaskedLM, AutoTokenizer
@@ -18,6 +19,7 @@ from ligm.masking import (
     candidate_word_mask,
     random_word_mask,
     select_ligm_targets,
+    weight_ligm_targets,
 )
 from ligm.online import compare_local_recovery, read_report
 from ligm.rotary import use_torch_rotary
@@ -36,16 +38,20 @@ def set_seed(seed: int) -> dict[str, torch.Generator]:
 
 
 def create_scheduler(optimizer, total_tokens: int, config) -> LambdaLR:
-    warmup_tokens = max(1, round(total_tokens * config.warmup_ratio))
-    stable_end = round(total_tokens * (config.warmup_ratio + config.stable_ratio))
+    phase_tokens = total_tokens - config.scheduler_origin_tokens
+    if phase_tokens <= 0:
+        raise ValueError("Scheduler origin must be below max tokens")
+    warmup_tokens = max(1, round(phase_tokens * config.warmup_ratio))
+    stable_end = round(phase_tokens * (config.warmup_ratio + config.stable_ratio))
 
     def scale(tokens_seen: int) -> float:
-        if tokens_seen < warmup_tokens:
-            return tokens_seen / warmup_tokens
-        if tokens_seen < stable_end:
+        elapsed_tokens = max(0, tokens_seen - config.scheduler_origin_tokens)
+        if elapsed_tokens < warmup_tokens:
+            return elapsed_tokens / warmup_tokens
+        if elapsed_tokens < stable_end:
             return 1.0
-        decay_tokens = max(1, total_tokens - stable_end)
-        return max(0.0, 1.0 - (tokens_seen - stable_end) / decay_tokens)
+        decay_tokens = max(1, phase_tokens - stable_end)
+        return max(0.0, 1.0 - (elapsed_tokens - stable_end) / decay_tokens)
 
     return LambdaLR(optimizer, scale)
 
@@ -71,6 +77,29 @@ def build_masked_batch(config: RunConfig, teacher, batch, tokenizer, generator):
             tokenizer.mask_token_id,
             tokenizer.vocab_size,
             generator,
+            config.training.mask_ratio,
+        )
+    if config.training.method == "ligm_weighted":
+        masked = random_word_mask(
+            batch.input_ids,
+            batch.word_ids,
+            tokenizer.mask_token_id,
+            tokenizer.vocab_size,
+            generator,
+            config.training.mask_ratio,
+        )
+        scores = information_gain_scores(
+            teacher.model,
+            masked.input_ids,
+            batch.attention_mask,
+            masked.labels,
+        )
+        return weight_ligm_targets(
+            masked,
+            batch.word_ids,
+            scores,
+            config.training.target_ratio,
+            config.training.target_loss_weight,
         )
     candidates = candidate_word_mask(
         batch.input_ids,
@@ -220,6 +249,12 @@ def train(config: RunConfig) -> Path:
             tokens_seen // config.training.checkpoint_every_tokens + 1
         ) * config.training.checkpoint_every_tokens
         last_checkpoint_tokens = tokens_seen
+        if config.training.restart_optimizer:
+            optimizer.state.clear()
+            for group in optimizer.param_groups:
+                group["lr"] = config.training.learning_rate
+                group.pop("initial_lr", None)
+            scheduler = create_scheduler(optimizer, config.training.max_tokens, config.training)
         rebase_scheduler(scheduler, tokens_seen)
 
     metric_path = output_dir / "metrics.jsonl"
@@ -265,7 +300,21 @@ def train(config: RunConfig) -> Path:
             attention_mask=batch.attention_mask,
             labels=masked.labels,
         )
-        loss = output.loss / config.training.gradient_accumulation
+        if masked.loss_weights is None:
+            batch_loss = output.loss
+        else:
+            selected_logits = (
+                output.logits[masked.selected]
+                if output.logits.ndim == 3
+                else output.logits
+            )
+            selected_labels = masked.labels[masked.selected]
+            token_losses = F.cross_entropy(
+                selected_logits.float(), selected_labels, reduction="none"
+            )
+            weights = masked.loss_weights[masked.selected].to(token_losses)
+            batch_loss = (token_losses * weights).sum() / weights.sum()
+        loss = batch_loss / config.training.gradient_accumulation
         loss.backward()
 
         batch_tokens = int(batch.attention_mask.sum())

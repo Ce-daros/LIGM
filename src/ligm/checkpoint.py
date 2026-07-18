@@ -91,7 +91,10 @@ def load_checkpoint(
     state = torch.load(path, map_location="cpu", weights_only=False)
     model.load_state_dict(state["model"])
     if teacher is not None:
-        teacher.load_state_dict(state["teacher"])
+        if state["teacher"] is None:
+            teacher.model.load_state_dict(state["model"])
+        else:
+            teacher.load_state_dict(state["teacher"])
     optimizer.load_state_dict(state["optimizer"])
     scheduler.load_state_dict(state["scheduler"])
     source.load_state_dict(state["source"])

@@ -13,6 +13,7 @@ class MaskedBatch:
     selected: Tensor
     candidates: Tensor | None = None
     scores: Tensor | None = None
+    loss_weights: Tensor | None = None
 
 
 def _groups(word_ids: Tensor) -> list[Tensor]:
@@ -141,3 +142,38 @@ def select_ligm_targets(
     selected = _mask_from_groups(input_ids.shape, selected_groups, input_ids.device)
     corrupted, labels = corrupt(input_ids, selected, mask_token_id, vocab_size, generator)
     return MaskedBatch(corrupted, labels, selected, candidates=candidates, scores=scores)
+
+
+def weight_ligm_targets(
+    masked: MaskedBatch,
+    word_ids: Tensor,
+    scores: Tensor,
+    target_ratio: float = 0.20,
+    target_weight: float = 4.0,
+) -> MaskedBatch:
+    loss_weights = masked.selected.float()
+    for batch_index, row_word_ids in enumerate(word_ids.cpu()):
+        groups = [
+            group
+            for group in _groups(row_word_ids)
+            if masked.selected[batch_index, group.to(masked.selected.device)].all()
+        ]
+        groups.sort(
+            key=lambda group: float(scores[batch_index, group.to(scores.device)].mean()),
+            reverse=True,
+        )
+        target_count = round(int((row_word_ids >= 0).sum()) * target_ratio)
+        count = 0
+        for group in groups:
+            if count >= target_count:
+                break
+            loss_weights[batch_index, group.to(loss_weights.device)] = target_weight
+            count += group.numel()
+
+    return MaskedBatch(
+        masked.input_ids,
+        masked.labels,
+        masked.selected,
+        scores=scores,
+        loss_weights=loss_weights,
+    )
