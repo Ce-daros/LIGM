@@ -2,7 +2,7 @@ import argparse
 import json
 import math
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 import numpy as np
@@ -307,7 +307,18 @@ class RetentionMemory:
 def _build_retention_memory(config, teacher, tokenizer) -> RetentionMemory:
     training = config.training
     batch_size = min(16, training.retention_windows)
-    source = create_document_source(config.data, training.seed + 1009, batch_size)
+    retention_data = replace(
+        config.data,
+        streams=tuple(
+            replace(stream, local=f"{stream.local}-af-red")
+            for stream in config.data.streams
+        ),
+    )
+    source = create_document_source(
+        retention_data,
+        training.seed + 1009,
+        batch_size,
+    )
     data_generator = torch.Generator().manual_seed(training.seed + 1010)
     mask_generator = torch.Generator().manual_seed(training.seed + 1011)
     device = next(teacher.model.parameters()).device
