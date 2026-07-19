@@ -351,7 +351,12 @@ def train(config: RunConfig) -> Path:
             if layer_index % interval == 0:
                 layer.requires_grad_(True)
         model.enable_input_require_grads()
-    model.gradient_checkpointing_enable()
+    if config.training.method == "na_red":
+        model.gradient_checkpointing_enable(
+            gradient_checkpointing_kwargs={"use_reentrant": False}
+        )
+    else:
+        model.gradient_checkpointing_enable()
     model.train()
 
     teacher = (
