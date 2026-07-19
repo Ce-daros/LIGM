@@ -197,7 +197,13 @@ def _backward_na_red(masked, output, model, gradient_accumulation: int):
     targeted = masked.loss_weights[masked.selected] > 1
     protected = masked.protected[masked.selected]
     if not targeted.any() or not protected.any():
-        raise RuntimeError("NA-RED requires remote and local evidence targets")
+        base_loss = token_losses.mean()
+        (base_loss / gradient_accumulation).backward()
+        return base_loss.detach(), {
+            "anchor_kl": 0.0,
+            "gradient_cosine": 0.0,
+            "remote_scale": 0.0,
+        }
 
     base_loss = token_losses.mean()
     remote_loss = token_losses[targeted].mean()
