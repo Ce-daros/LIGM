@@ -25,12 +25,12 @@ from ligm.masking import (
     weight_ligm_targets,
 )
 from ligm.online import compare_local_recovery, read_report
-from ligm.rotary import use_torch_rotary
 from ligm.retention import (
     asymmetric_retention_loss,
     project_conflicting_gradients,
     true_class_margins,
 )
+from ligm.rotary import use_torch_rotary
 from ligm.scoring import (
     entropy_scores,
     information_gain_scores,
