@@ -414,23 +414,27 @@ def _backward_af_red(
         selected_logits.float(), selected_labels, reduction="none"
     )
     targeted = masked.loss_weights[masked.selected] > 1
-    if not targeted.any():
-        raise RuntimeError("AF-RED requires remote evidence targets")
     base_loss = token_losses.mean()
-    remote_loss = token_losses[targeted].mean()
 
     parameters = [parameter for parameter in model.parameters() if parameter.requires_grad]
     retention_gradients = _gradients(retention_loss, parameters, False)
-    base_gradients = _gradients(base_loss, parameters, True)
-    remote_gradients = _gradients(remote_loss, parameters, False)
-    projected_remote, negative_blocks, cosine = project_conflicting_gradients(
-        remote_gradients,
-        retention_gradients,
-        _gradient_block_ids(model),
-    )
-
-    target_fraction = targeted.float().mean()
-    remote_coefficient = (target_loss_weight - 1) * target_fraction
+    base_gradients = _gradients(base_loss, parameters, bool(targeted.any()))
+    if targeted.any():
+        remote_loss = token_losses[targeted].mean()
+        remote_gradients = _gradients(remote_loss, parameters, False)
+        projected_remote, negative_blocks, cosine = project_conflicting_gradients(
+            remote_gradients,
+            retention_gradients,
+            _gradient_block_ids(model),
+        )
+        target_fraction = targeted.float().mean()
+        remote_coefficient = (target_loss_weight - 1) * target_fraction
+    else:
+        remote_loss = torch.zeros_like(base_loss)
+        projected_remote = [torch.zeros_like(base) for base in base_gradients]
+        negative_blocks = 0
+        cosine = torch.zeros_like(base_loss)
+        remote_coefficient = torch.zeros_like(base_loss)
     base_norm = torch.sqrt(
         sum(base.float().square().sum() for base in base_gradients) + 1e-12
     )
