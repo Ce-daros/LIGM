@@ -1,6 +1,8 @@
 import argparse
 import json
+import math
 import time
+from dataclasses import dataclass
 from pathlib import Path
 
 import numpy as np
@@ -24,6 +26,11 @@ from ligm.masking import (
 )
 from ligm.online import compare_local_recovery, read_report
 from ligm.rotary import use_torch_rotary
+from ligm.retention import (
+    asymmetric_retention_loss,
+    project_conflicting_gradients,
+    true_class_margins,
+)
 from ligm.scoring import (
     entropy_scores,
     information_gain_scores,
@@ -106,7 +113,7 @@ def build_masked_batch(config: RunConfig, teacher, batch, tokenizer, generator):
             config.training.target_ratio,
             config.training.target_loss_weight,
         )
-    if config.training.method in {"red", "red_route", "na_red"}:
+    if config.training.method in {"red", "red_route", "na_red", "af_red"}:
         masked = random_word_mask(
             batch.input_ids,
             batch.word_ids,
@@ -276,6 +283,186 @@ def _backward_na_red(masked, output, model, gradient_accumulation: int):
     }
 
 
+@dataclass(frozen=True)
+class RetentionMemory:
+    input_ids: torch.Tensor
+    attention_mask: torch.Tensor
+    labels: torch.Tensor
+    anchor_margins: torch.Tensor
+
+    def sample(self, size: int, generator: torch.Generator, device):
+        indices = torch.randint(len(self.input_ids), (size,), generator=generator)
+        labels = self.labels[indices]
+        selected = labels != -100
+        anchor_margins = self.anchor_margins[indices][selected].to(device)
+        return (
+            self.input_ids[indices].to(device),
+            self.attention_mask[indices].to(device),
+            labels.to(device),
+            anchor_margins,
+        )
+
+
+@torch.no_grad()
+def _build_retention_memory(config, teacher, tokenizer) -> RetentionMemory:
+    training = config.training
+    batch_size = min(16, training.retention_windows)
+    source = create_document_source(config.data, training.seed + 1009, batch_size)
+    data_generator = torch.Generator().manual_seed(training.seed + 1010)
+    mask_generator = torch.Generator().manual_seed(training.seed + 1011)
+    device = next(teacher.model.parameters()).device
+    inputs = []
+    attention_masks = []
+    labels = []
+    margins = []
+    for _ in range(math.ceil(training.retention_windows / batch_size)):
+        encoded = next_encoded_batch(
+            source,
+            tokenizer,
+            training.retention_length,
+            batch_size,
+            data_generator,
+        )
+        masked = random_word_mask(
+            encoded.input_ids.to(device),
+            encoded.word_ids,
+            tokenizer.mask_token_id,
+            tokenizer.vocab_size,
+            mask_generator,
+            training.mask_ratio,
+        )
+        attention_mask = encoded.attention_mask.to(device)
+        output = teacher.model(
+            input_ids=masked.input_ids,
+            attention_mask=attention_mask,
+            labels=masked.labels,
+        )
+        selected_logits = (
+            output.logits[masked.selected]
+            if output.logits.ndim == 3
+            else output.logits
+        )
+        selected_labels = masked.labels[masked.selected]
+        selected_margins = true_class_margins(selected_logits, selected_labels)
+        known = selected_margins >= training.retention_min_margin
+        retained_labels = torch.full_like(masked.labels, -100)
+        retained_margins = torch.zeros_like(masked.labels, dtype=torch.float32)
+        selected_positions = masked.selected.nonzero(as_tuple=True)
+        retained_labels[selected_positions[0][known], selected_positions[1][known]] = (
+            selected_labels[known]
+        )
+        retained_margins[
+            selected_positions[0][known], selected_positions[1][known]
+        ] = selected_margins[known]
+        inputs.append(masked.input_ids.cpu())
+        attention_masks.append(encoded.attention_mask)
+        labels.append(retained_labels.cpu())
+        margins.append(retained_margins.cpu())
+
+    limit = training.retention_windows
+    memory = RetentionMemory(
+        torch.cat(inputs)[:limit],
+        torch.cat(attention_masks)[:limit],
+        torch.cat(labels)[:limit],
+        torch.cat(margins)[:limit],
+    )
+    if not (memory.labels != -100).any(dim=1).all():
+        raise RuntimeError("AF-RED retention memory contains a window without known tokens")
+    return memory
+
+
+def _gradient_block_ids(model) -> list[str]:
+    blocks = []
+    for name, parameter in model.named_parameters():
+        if not parameter.requires_grad:
+            continue
+        prefix, separator, suffix = name.partition(".layers.")
+        if separator:
+            blocks.append(f"{prefix}.layers.{suffix.split('.', 1)[0]}")
+        else:
+            blocks.append(name.rsplit(".", 1)[0])
+    return blocks
+
+
+def _backward_af_red(
+    masked,
+    output,
+    model,
+    retention_loss,
+    retention_risk,
+    retention_flip_rate,
+    retention_dual: float,
+    target_loss_weight: float,
+    gradient_accumulation: int,
+):
+    selected_logits = (
+        output.logits[masked.selected] if output.logits.ndim == 3 else output.logits
+    )
+    selected_labels = masked.labels[masked.selected]
+    token_losses = F.cross_entropy(
+        selected_logits.float(), selected_labels, reduction="none"
+    )
+    targeted = masked.loss_weights[masked.selected] > 1
+    if not targeted.any():
+        raise RuntimeError("AF-RED requires remote evidence targets")
+    base_loss = token_losses.mean()
+    remote_loss = token_losses[targeted].mean()
+
+    parameters = [parameter for parameter in model.parameters() if parameter.requires_grad]
+    retention_gradients = _gradients(retention_loss, parameters, False)
+    base_gradients = _gradients(base_loss, parameters, True)
+    remote_gradients = _gradients(remote_loss, parameters, False)
+    projected_remote, negative_blocks, cosine = project_conflicting_gradients(
+        remote_gradients,
+        retention_gradients,
+        _gradient_block_ids(model),
+    )
+
+    target_fraction = targeted.float().mean()
+    remote_coefficient = (target_loss_weight - 1) * target_fraction
+    base_norm = torch.sqrt(
+        sum(base.float().square().sum() for base in base_gradients) + 1e-12
+    )
+    retention_norm = torch.sqrt(
+        sum(
+            retention.float().square().sum()
+            for retention in retention_gradients
+        )
+        + 1e-12
+    )
+    retention_scale = (base_norm / retention_norm).clamp(0.25, 4.0)
+
+    with torch.no_grad():
+        for parameter, base, remote, retention in zip(
+            parameters,
+            base_gradients,
+            projected_remote,
+            retention_gradients,
+            strict=True,
+        ):
+            gradient = (base + remote_coefficient.to(remote) * remote) / (
+                1 + remote_coefficient
+            )
+            gradient = gradient + retention_dual * retention_scale.to(retention) * retention
+            gradient = gradient / gradient_accumulation
+            if parameter.grad is None:
+                parameter.grad = gradient.to(parameter).detach()
+            else:
+                parameter.grad.add_(gradient.to(parameter))
+
+    combined_loss = (base_loss + remote_coefficient * remote_loss) / (
+        1 + remote_coefficient
+    )
+    return combined_loss.detach(), {
+        "retention_loss": float(retention_loss.detach()),
+        "retention_risk": float(retention_risk.detach()),
+        "retention_flip_rate": float(retention_flip_rate.detach()),
+        "retention_dual": retention_dual,
+        "gradient_cosine": float(cosine.detach()),
+        "negative_gradient_blocks": negative_blocks,
+    }
+
+
 def _run_online_evaluation(
     config: RunConfig,
     model,
@@ -349,6 +536,7 @@ def train(config: RunConfig) -> Path:
         "red",
         "red_route",
         "na_red",
+        "af_red",
     }
     if config.training.method == "red_route":
         model.requires_grad_(False)
@@ -357,7 +545,7 @@ def train(config: RunConfig) -> Path:
             if layer_index % interval == 0:
                 layer.requires_grad_(True)
         model.enable_input_require_grads()
-    if config.training.method == "na_red":
+    if config.training.method in {"na_red", "af_red"}:
         model.gradient_checkpointing_enable(
             gradient_checkpointing_kwargs={"use_reentrant": False}
         )
@@ -427,6 +615,19 @@ def train(config: RunConfig) -> Path:
             stop_requested = True
             selected_checkpoint = initial_checkpoint
 
+    retention_memory = None
+    retention_generator = None
+    retention_dual = config.training.retention_dual_initial
+    if config.training.method == "af_red":
+        retention_memory = _build_retention_memory(
+            config,
+            teacher,
+            tokenizer,
+        )
+        retention_generator = torch.Generator().manual_seed(
+            config.training.seed + 1012
+        )
+
     optimizer.zero_grad(set_to_none=True)
     interval_start = time.perf_counter()
     interval_tokens = 0
@@ -456,7 +657,63 @@ def train(config: RunConfig) -> Path:
             labels=masked.labels,
         )
         gradient_stats = {}
-        if config.training.method == "na_red":
+        if config.training.method == "af_red":
+            (
+                retention_input_ids,
+                retention_attention_mask,
+                retention_labels,
+                anchor_margins,
+            ) = retention_memory.sample(
+                config.training.retention_batch_size,
+                retention_generator,
+                device,
+            )
+            retention_output = model(
+                input_ids=retention_input_ids,
+                attention_mask=retention_attention_mask,
+                labels=retention_labels,
+            )
+            retention_selected = retention_labels != -100
+            retention_logits = (
+                retention_output.logits[retention_selected]
+                if retention_output.logits.ndim == 3
+                else retention_output.logits
+            )
+            retention_loss, retention_risk, retention_flip_rate = (
+                asymmetric_retention_loss(
+                    retention_logits,
+                    retention_labels[retention_selected],
+                    anchor_margins,
+                    config.training.retention_margin_allowance,
+                    config.training.retention_temperature,
+                )
+            )
+            batch_loss, gradient_stats = _backward_af_red(
+                masked,
+                output,
+                model,
+                retention_loss,
+                retention_risk,
+                retention_flip_rate,
+                retention_dual,
+                config.training.target_loss_weight,
+                config.training.gradient_accumulation,
+            )
+            loss = batch_loss / config.training.gradient_accumulation
+            retention_dual = min(
+                config.training.retention_dual_max,
+                max(
+                    0.0,
+                    retention_dual
+                    + config.training.retention_dual_learning_rate
+                    * (
+                        float(retention_risk.detach())
+                        - config.training.retention_risk_budget
+                    )
+                    / config.training.gradient_accumulation,
+                ),
+            )
+        elif config.training.method == "na_red":
             batch_loss, gradient_stats = _backward_na_red(
                 masked,
                 output,
@@ -491,7 +748,10 @@ def train(config: RunConfig) -> Path:
             optimizer.step()
             rebase_scheduler(scheduler, tokens_seen)
             optimizer.zero_grad(set_to_none=True)
-            if teacher is not None and config.training.method != "na_red":
+            if teacher is not None and config.training.method not in {
+                "na_red",
+                "af_red",
+            }:
                 teacher.update(model)
             step += 1
 

@@ -53,6 +53,16 @@ class TrainingConfig:
     mask_ratio: float = 0.30
     target_ratio: float = 0.20
     target_loss_weight: float = 4.0
+    retention_windows: int = 1024
+    retention_length: int = 256
+    retention_batch_size: int = 8
+    retention_min_margin: float = 1.0
+    retention_margin_allowance: float = 0.25
+    retention_temperature: float = 0.125
+    retention_risk_budget: float = 0.13
+    retention_dual_initial: float = 0.25
+    retention_dual_learning_rate: float = 2.0
+    retention_dual_max: float = 2.0
     scheduler_origin_tokens: int = 0
     restart_optimizer: bool = False
     warmup_ratio: float = 0.02
@@ -114,6 +124,7 @@ def load_config(path: str | Path) -> RunConfig:
         "red",
         "red_route",
         "na_red",
+        "af_red",
         "entropy",
         "random",
     }:
@@ -130,6 +141,15 @@ def load_config(path: str | Path) -> RunConfig:
         raise ValueError("Target ratio must be positive and no greater than mask ratio")
     if training.target_loss_weight < 1.0:
         raise ValueError("Target loss weight must be at least one")
+    if training.method == "af_red":
+        if training.retention_windows < training.retention_batch_size:
+            raise ValueError("AF-RED retention memory must contain at least one batch")
+        if training.retention_length <= 0 or training.retention_batch_size <= 0:
+            raise ValueError("AF-RED retention dimensions must be positive")
+        if training.retention_temperature <= 0:
+            raise ValueError("AF-RED retention temperature must be positive")
+        if not 0 <= training.retention_risk_budget <= 1:
+            raise ValueError("AF-RED retention risk budget must be between zero and one")
     if online.reference_dir and training.method == "random":
         raise ValueError("Random reference runs cannot use an online reference directory")
     return config
