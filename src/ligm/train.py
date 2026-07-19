@@ -254,6 +254,7 @@ def train(config: RunConfig) -> Path:
         for layer_index, layer in enumerate(model.model.layers):
             if layer_index % interval == 0:
                 layer.requires_grad_(True)
+        model.enable_input_require_grads()
     model.gradient_checkpointing_enable()
     model.train()
 
