@@ -27,7 +27,7 @@ from ligm.rotary import use_torch_rotary
 from ligm.scoring import (
     entropy_scores,
     information_gain_scores,
-    remote_evidence_scores,
+    remote_evidence_statistics,
 )
 
 
@@ -106,7 +106,7 @@ def build_masked_batch(config: RunConfig, teacher, batch, tokenizer, generator):
             config.training.target_ratio,
             config.training.target_loss_weight,
         )
-    if config.training.method in {"red", "red_route"}:
+    if config.training.method in {"red", "red_route", "na_red"}:
         masked = random_word_mask(
             batch.input_ids,
             batch.word_ids,
@@ -115,13 +115,13 @@ def build_masked_batch(config: RunConfig, teacher, batch, tokenizer, generator):
             generator,
             config.training.mask_ratio,
         )
-        ablated, eligibility = remote_evidence_ablation(
+        ablated, eligibility, protected = remote_evidence_ablation(
             batch.input_ids,
             masked,
             batch.attention_mask,
             tokenizer.mask_token_id,
         )
-        scores = remote_evidence_scores(
+        scores, anchor_logits = remote_evidence_statistics(
             teacher.model,
             masked.input_ids,
             ablated,
@@ -136,6 +136,8 @@ def build_masked_batch(config: RunConfig, teacher, batch, tokenizer, generator):
             config.training.target_ratio,
             config.training.target_loss_weight,
             eligibility,
+            protected if config.training.method == "na_red" else None,
+            anchor_logits if config.training.method == "na_red" else None,
         )
     candidates = candidate_word_mask(
         batch.input_ids,
@@ -173,6 +175,99 @@ def _append_metric(path: Path, metric: dict) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("a", encoding="utf-8") as handle:
         handle.write(json.dumps(metric, ensure_ascii=False) + "\n")
+
+
+def _gradients(loss, parameters, retain_graph: bool):
+    return torch.autograd.grad(
+        loss,
+        parameters,
+        retain_graph=retain_graph,
+        allow_unused=False,
+    )
+
+
+def _backward_na_red(masked, output, model, gradient_accumulation: int):
+    selected_logits = (
+        output.logits[masked.selected] if output.logits.ndim == 3 else output.logits
+    )
+    selected_labels = masked.labels[masked.selected]
+    token_losses = F.cross_entropy(
+        selected_logits.float(), selected_labels, reduction="none"
+    )
+    targeted = masked.loss_weights[masked.selected] > 1
+    protected = masked.protected[masked.selected]
+    if not targeted.any() or not protected.any():
+        raise RuntimeError("NA-RED requires remote and local evidence targets")
+
+    base_loss = token_losses.mean()
+    remote_loss = token_losses[targeted].mean()
+    local_loss = token_losses[protected].mean()
+
+    anchor_logits = masked.anchor_logits[masked.selected][protected].float()
+    student_local_logits = selected_logits[protected].float()
+    anchor_values, anchor_indices = anchor_logits.topk(32, dim=-1)
+    anchor_distribution = F.softmax(anchor_values / 2.0, dim=-1)
+    student_values = student_local_logits.gather(1, anchor_indices) / 2.0
+    anchor_kl = F.kl_div(
+        F.log_softmax(student_values, dim=-1),
+        anchor_distribution,
+        reduction="batchmean",
+    ) * 4.0
+    protection_loss = local_loss + 0.5 * anchor_kl
+
+    parameters = [parameter for parameter in model.parameters() if parameter.requires_grad]
+    protection_gradients = _gradients(protection_loss, parameters, True)
+    base_gradients = _gradients(base_loss, parameters, True)
+    remote_gradients = _gradients(remote_loss, parameters, False)
+
+    dot = sum(
+        (remote.float() * protection.float()).sum()
+        for remote, protection in zip(
+            remote_gradients, protection_gradients, strict=True
+        )
+    )
+    protection_norm_sq = sum(
+        protection.float().square().sum() for protection in protection_gradients
+    )
+    projection = dot.clamp_max(0) / (protection_norm_sq + 1e-12)
+    projected_remote = [
+        remote - projection.to(remote) * protection
+        for remote, protection in zip(
+            remote_gradients, protection_gradients, strict=True
+        )
+    ]
+    base_norm = torch.sqrt(
+        sum(base.float().square().sum() for base in base_gradients) + 1e-12
+    )
+    remote_norm = torch.sqrt(
+        sum(remote.float().square().sum() for remote in projected_remote) + 1e-12
+    )
+    adaptive_scale = (base_norm / remote_norm).clamp(0.5, 2.0)
+    target_fraction = targeted.float().mean()
+    remote_coefficient = adaptive_scale * target_fraction
+    normalization = 1 + remote_coefficient
+
+    with torch.no_grad():
+        for parameter, base, remote in zip(
+            parameters, base_gradients, projected_remote, strict=True
+        ):
+            gradient = (base + remote_coefficient.to(remote) * remote) / normalization
+            gradient = gradient / gradient_accumulation
+            if parameter.grad is None:
+                parameter.grad = gradient.to(parameter).detach()
+            else:
+                parameter.grad.add_(gradient.to(parameter))
+
+    combined_loss = (base_loss + remote_coefficient * remote_loss) / normalization
+    remote_raw_norm = torch.sqrt(
+        sum(remote.float().square().sum() for remote in remote_gradients) + 1e-12
+    )
+    cosine = dot / (torch.sqrt(protection_norm_sq + 1e-12) * remote_raw_norm)
+    return combined_loss.detach(), {
+        "anchor_kl": float(anchor_kl.detach()),
+        "gradient_cosine": float(cosine.detach()),
+        "remote_scale": float(adaptive_scale.detach()),
+    }
 
 
 def _run_online_evaluation(
@@ -247,6 +342,7 @@ def train(config: RunConfig) -> Path:
         "ligm_weighted",
         "red",
         "red_route",
+        "na_red",
     }
     if config.training.method == "red_route":
         model.requires_grad_(False)
@@ -348,8 +444,19 @@ def train(config: RunConfig) -> Path:
             attention_mask=batch.attention_mask,
             labels=masked.labels,
         )
-        if masked.loss_weights is None:
+        gradient_stats = {}
+        if config.training.method == "na_red":
+            batch_loss, gradient_stats = _backward_na_red(
+                masked,
+                output,
+                model,
+                config.training.gradient_accumulation,
+            )
+            loss = batch_loss / config.training.gradient_accumulation
+        elif masked.loss_weights is None:
             batch_loss = output.loss
+            loss = batch_loss / config.training.gradient_accumulation
+            loss.backward()
         else:
             selected_logits = (
                 output.logits[masked.selected]
@@ -362,8 +469,8 @@ def train(config: RunConfig) -> Path:
             )
             weights = masked.loss_weights[masked.selected].to(token_losses)
             batch_loss = (token_losses * weights).sum() / weights.sum()
-        loss = batch_loss / config.training.gradient_accumulation
-        loss.backward()
+            loss = batch_loss / config.training.gradient_accumulation
+            loss.backward()
 
         batch_tokens = int(batch.attention_mask.sum())
         tokens_seen += batch_tokens
@@ -373,7 +480,7 @@ def train(config: RunConfig) -> Path:
             optimizer.step()
             rebase_scheduler(scheduler, tokens_seen)
             optimizer.zero_grad(set_to_none=True)
-            if teacher is not None:
+            if teacher is not None and config.training.method != "na_red":
                 teacher.update(model)
             step += 1
 
@@ -397,6 +504,7 @@ def train(config: RunConfig) -> Path:
                     metric["mean_target_score"] = float(
                         masked.scores[targeted].mean() if targeted.any() else 0.0
                     )
+                metric.update(gradient_stats)
                 _append_metric(metric_path, metric)
                 interval_start = time.perf_counter()
                 interval_tokens = 0

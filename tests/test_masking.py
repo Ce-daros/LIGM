@@ -98,7 +98,7 @@ def test_remote_evidence_ablation_removes_only_distant_evidence():
     labels = original.masked_fill(~selected, -100)
     masked = MaskedBatch(masked_ids, labels, selected)
 
-    ablated, eligibility = remote_evidence_ablation(
+    ablated, eligibility, protected = remote_evidence_ablation(
         original,
         masked,
         torch.ones_like(original),
@@ -107,5 +107,6 @@ def test_remote_evidence_ablation_removes_only_distant_evidence():
 
     assert eligibility[0, 1]
     assert not eligibility[0, 2]
+    assert not protected.any()
     assert ablated[0, -2] == 999
     assert ablated[0, -1] == 5

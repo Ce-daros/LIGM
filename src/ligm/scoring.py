@@ -68,14 +68,14 @@ def information_gain_scores(
 
 
 @torch.no_grad()
-def remote_evidence_scores(
+def remote_evidence_statistics(
     teacher: nn.Module,
     full_input_ids: Tensor,
     ablated_input_ids: Tensor,
     attention_mask: Tensor,
     labels: Tensor,
     eligibility: Tensor,
-) -> Tensor:
+) -> tuple[Tensor, Tensor]:
     teacher.eval()
     full_output = teacher(
         input_ids=full_input_ids,
@@ -95,7 +95,7 @@ def remote_evidence_scores(
     flat_scores = flat_scores * eligibility[selected]
     scores = torch.zeros_like(labels, dtype=torch.float32)
     scores[selected] = flat_scores
-    return scores
+    return scores, full_output.logits.detach()
 
 
 @torch.no_grad()

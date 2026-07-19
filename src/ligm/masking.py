@@ -14,6 +14,8 @@ class MaskedBatch:
     candidates: Tensor | None = None
     scores: Tensor | None = None
     loss_weights: Tensor | None = None
+    protected: Tensor | None = None
+    anchor_logits: Tensor | None = None
 
 
 def _groups(word_ids: Tensor) -> list[Tensor]:
@@ -151,6 +153,8 @@ def weight_ligm_targets(
     target_ratio: float = 0.20,
     target_weight: float = 4.0,
     eligibility: Tensor | None = None,
+    protected: Tensor | None = None,
+    anchor_logits: Tensor | None = None,
 ) -> MaskedBatch:
     loss_weights = masked.selected.float()
     for batch_index, row_word_ids in enumerate(word_ids.cpu()):
@@ -181,6 +185,8 @@ def weight_ligm_targets(
         masked.selected,
         scores=scores,
         loss_weights=loss_weights,
+        protected=protected,
+        anchor_logits=anchor_logits,
     )
 
 
@@ -191,9 +197,10 @@ def remote_evidence_ablation(
     mask_token_id: int,
     local_radius: int = 128,
     remote_distance: int = 512,
-) -> tuple[Tensor, Tensor]:
+) -> tuple[Tensor, Tensor, Tensor]:
     ablated = masked.input_ids.clone()
     eligibility = torch.zeros_like(masked.selected)
+    protected = torch.zeros_like(masked.selected)
     for batch_index in range(original_ids.shape[0]):
         tokens = original_ids[batch_index].detach().cpu().tolist()
         available = (
@@ -210,6 +217,7 @@ def remote_evidence_ablation(
         for position in selected_positions:
             matching = occurrences.get(tokens[position], [])
             if any(abs(position - other) <= local_radius for other in matching):
+                protected[batch_index, position] = True
                 continue
             remote = [
                 other for other in matching if abs(position - other) >= remote_distance
@@ -222,4 +230,4 @@ def remote_evidence_ablation(
                 sorted(evidence_positions), device=ablated.device, dtype=torch.long
             )
             ablated[batch_index, indices] = mask_token_id
-    return ablated, eligibility
+    return ablated, eligibility, protected
