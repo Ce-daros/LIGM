@@ -150,6 +150,7 @@ def weight_ligm_targets(
     scores: Tensor,
     target_ratio: float = 0.20,
     target_weight: float = 4.0,
+    eligibility: Tensor | None = None,
 ) -> MaskedBatch:
     loss_weights = masked.selected.float()
     for batch_index, row_word_ids in enumerate(word_ids.cpu()):
@@ -157,6 +158,10 @@ def weight_ligm_targets(
             group
             for group in _groups(row_word_ids)
             if masked.selected[batch_index, group.to(masked.selected.device)].all()
+            and (
+                eligibility is None
+                or eligibility[batch_index, group.to(eligibility.device)].any()
+            )
         ]
         groups.sort(
             key=lambda group: float(scores[batch_index, group.to(scores.device)].mean()),
@@ -177,3 +182,44 @@ def weight_ligm_targets(
         scores=scores,
         loss_weights=loss_weights,
     )
+
+
+def remote_evidence_ablation(
+    original_ids: Tensor,
+    masked: MaskedBatch,
+    attention_mask: Tensor,
+    mask_token_id: int,
+    local_radius: int = 128,
+    remote_distance: int = 512,
+) -> tuple[Tensor, Tensor]:
+    ablated = masked.input_ids.clone()
+    eligibility = torch.zeros_like(masked.selected)
+    for batch_index in range(original_ids.shape[0]):
+        tokens = original_ids[batch_index].detach().cpu().tolist()
+        available = (
+            (attention_mask[batch_index] == 1) & ~masked.selected[batch_index]
+        ).detach().cpu()
+        occurrences: dict[int, list[int]] = {}
+        for position in torch.where(available)[0].tolist():
+            occurrences.setdefault(tokens[position], []).append(position)
+
+        evidence_positions: set[int] = set()
+        selected_positions = torch.where(
+            masked.selected[batch_index].detach().cpu()
+        )[0].tolist()
+        for position in selected_positions:
+            matching = occurrences.get(tokens[position], [])
+            if any(abs(position - other) <= local_radius for other in matching):
+                continue
+            remote = [
+                other for other in matching if abs(position - other) >= remote_distance
+            ]
+            if remote:
+                eligibility[batch_index, position] = True
+                evidence_positions.update(remote)
+        if evidence_positions:
+            indices = torch.tensor(
+                sorted(evidence_positions), device=ablated.device, dtype=torch.long
+            )
+            ablated[batch_index, indices] = mask_token_id
+    return ablated, eligibility

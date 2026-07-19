@@ -111,6 +111,8 @@ def load_config(path: str | Path) -> RunConfig:
         "ligm",
         "ligm_gain",
         "ligm_weighted",
+        "red",
+        "red_route",
         "entropy",
         "random",
     }:

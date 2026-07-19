@@ -1,8 +1,10 @@
 import torch
 
 from ligm.masking import (
+    MaskedBatch,
     candidate_word_mask,
     random_word_mask,
+    remote_evidence_ablation,
     select_ligm_targets,
     weight_ligm_targets,
 )
@@ -84,3 +86,26 @@ def test_weighted_ligm_preserves_random_mask_and_upweights_high_scores():
     assert torch.equal(weighted.selected, masked.selected)
     assert weighted.loss_weights[0, highest_scoring].eq(4.0).all()
     assert weighted.loss_weights[~weighted.selected].eq(0.0).all()
+
+
+def test_remote_evidence_ablation_removes_only_distant_evidence():
+    original = torch.tensor([[5, 7, 9, *(1000 + i for i in range(517)), 7, 5]])
+    selected = torch.zeros_like(original, dtype=torch.bool)
+    selected[0, 1] = True
+    selected[0, 2] = True
+    masked_ids = original.clone()
+    masked_ids[selected] = 999
+    labels = original.masked_fill(~selected, -100)
+    masked = MaskedBatch(masked_ids, labels, selected)
+
+    ablated, eligibility = remote_evidence_ablation(
+        original,
+        masked,
+        torch.ones_like(original),
+        999,
+    )
+
+    assert eligibility[0, 1]
+    assert not eligibility[0, 2]
+    assert ablated[0, -2] == 999
+    assert ablated[0, -1] == 5

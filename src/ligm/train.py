@@ -18,12 +18,17 @@ from ligm.evaluate import natural_repetition_recovery_model
 from ligm.masking import (
     candidate_word_mask,
     random_word_mask,
+    remote_evidence_ablation,
     select_ligm_targets,
     weight_ligm_targets,
 )
 from ligm.online import compare_local_recovery, read_report
 from ligm.rotary import use_torch_rotary
-from ligm.scoring import entropy_scores, information_gain_scores
+from ligm.scoring import (
+    entropy_scores,
+    information_gain_scores,
+    remote_evidence_scores,
+)
 
 
 def set_seed(seed: int) -> dict[str, torch.Generator]:
@@ -100,6 +105,37 @@ def build_masked_batch(config: RunConfig, teacher, batch, tokenizer, generator):
             scores,
             config.training.target_ratio,
             config.training.target_loss_weight,
+        )
+    if config.training.method in {"red", "red_route"}:
+        masked = random_word_mask(
+            batch.input_ids,
+            batch.word_ids,
+            tokenizer.mask_token_id,
+            tokenizer.vocab_size,
+            generator,
+            config.training.mask_ratio,
+        )
+        ablated, eligibility = remote_evidence_ablation(
+            batch.input_ids,
+            masked,
+            batch.attention_mask,
+            tokenizer.mask_token_id,
+        )
+        scores = remote_evidence_scores(
+            teacher.model,
+            masked.input_ids,
+            ablated,
+            batch.attention_mask,
+            masked.labels,
+            eligibility,
+        )
+        return weight_ligm_targets(
+            masked,
+            batch.word_ids,
+            scores,
+            config.training.target_ratio,
+            config.training.target_loss_weight,
+            eligibility,
         )
     candidates = candidate_word_mask(
         batch.input_ids,
@@ -207,7 +243,17 @@ def train(config: RunConfig) -> Path:
     ).to(device)
     model.config.reference_compile = False
     model.config.sparse_prediction = True
-    model.config.repad_logits_with_grad = config.training.method == "ligm_weighted"
+    model.config.repad_logits_with_grad = config.training.method in {
+        "ligm_weighted",
+        "red",
+        "red_route",
+    }
+    if config.training.method == "red_route":
+        model.requires_grad_(False)
+        interval = model.config.global_attn_every_n_layers
+        for layer_index, layer in enumerate(model.model.layers):
+            if layer_index % interval == 0:
+                layer.requires_grad_(True)
     model.gradient_checkpointing_enable()
     model.train()
 
@@ -341,6 +387,15 @@ def train(config: RunConfig) -> Path:
                     "tokens_per_second": interval_tokens / elapsed,
                     "peak_memory_gib": torch.cuda.max_memory_allocated() / 2**30,
                 }
+                if masked.loss_weights is not None:
+                    targeted = masked.loss_weights > 1
+                    metric["targeted_tokens"] = int(targeted.sum())
+                    metric["target_fraction"] = float(
+                        targeted.sum() / masked.selected.sum()
+                    )
+                    metric["mean_target_score"] = float(
+                        masked.scores[targeted].mean() if targeted.any() else 0.0
+                    )
                 _append_metric(metric_path, metric)
                 interval_start = time.perf_counter()
                 interval_tokens = 0

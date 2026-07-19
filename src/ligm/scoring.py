@@ -68,6 +68,37 @@ def information_gain_scores(
 
 
 @torch.no_grad()
+def remote_evidence_scores(
+    teacher: nn.Module,
+    full_input_ids: Tensor,
+    ablated_input_ids: Tensor,
+    attention_mask: Tensor,
+    labels: Tensor,
+    eligibility: Tensor,
+) -> Tensor:
+    teacher.eval()
+    full_output = teacher(
+        input_ids=full_input_ids,
+        attention_mask=attention_mask,
+        labels=labels,
+    )
+    ablated_output = teacher(
+        input_ids=ablated_input_ids,
+        attention_mask=attention_mask,
+        labels=labels,
+    )
+    full_log_p, full_p = _true_log_probabilities(full_output.logits, labels)
+    ablated_log_p, _ = _true_log_probabilities(ablated_output.logits, labels)
+    flat_scores = (full_log_p - ablated_log_p).clamp_min(0)
+    flat_scores = flat_scores * 4 * full_p * (1 - full_p)
+    selected = labels != IGNORE_INDEX
+    flat_scores = flat_scores * eligibility[selected]
+    scores = torch.zeros_like(labels, dtype=torch.float32)
+    scores[selected] = flat_scores
+    return scores
+
+
+@torch.no_grad()
 def entropy_scores(
     teacher: nn.Module,
     candidate_input_ids: Tensor,
